@@ -231,11 +231,7 @@ class TrackStatusResponse(BaseModel):
 
 class StatusCountsResponse(BaseModel):
     """Response model for document status counts."""
-    pending: int = Field(0, ge=0)
-    processing: int = Field(0, ge=0)
-    processed: int = Field(0, ge=0)
-    failed: int = Field(0, ge=0)
-    total: int = Field(0, ge=0)
+    status_counts: Dict[str, int] = Field(..., description="Status counts mapping")
 
 
 class ClearCacheResponse(BaseModel):
