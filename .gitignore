@@ -177,6 +177,9 @@ cython_debug/
 *.temp
 *~
 
-# Implementation and planning files (optional - you may want to keep these)
-implementation_*.md
-test_*.py
+# Archive directory should be included in version control
+# archive/ - DO NOT IGNORE
+
+# Temporary test files (but not archived ones)
+temp_test_*.py
+debug_temp_*.py
