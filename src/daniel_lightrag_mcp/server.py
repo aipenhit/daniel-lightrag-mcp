@@ -177,8 +177,12 @@ def _create_error_response(error: Exception, tool_name: str) -> CallToolResult:
 async def handle_list_tools() -> ListToolsResult:
     """List available tools."""
     logger.info("Listing available MCP tools")
-    tools = [
-        # Document Management Tools (8 tools)
+    
+    # Create tools list with explicit validation
+    tools = []
+    
+    # Document Management Tools (8 tools)
+    tools.extend([
         Tool(
             name="insert_text",
             description="Insert text content into LightRAG",
@@ -292,8 +296,10 @@ async def handle_list_tools() -> ListToolsResult:
                 "required": []
             }
         ),
-        
-        # Query Tools (2 tools)
+    ])
+    
+    # Query Tools (2 tools)
+    tools.extend([
         Tool(
             name="query_text",
             description="Query LightRAG with text",
@@ -344,8 +350,10 @@ async def handle_list_tools() -> ListToolsResult:
                 "required": ["query"]
             }
         ),
-        
-        # Knowledge Graph Tools (7 tools)
+    ])
+    
+    # Knowledge Graph Tools (7 tools)
+    tools.extend([
         Tool(
             name="get_knowledge_graph",
             description="Retrieve the knowledge graph from LightRAG",
@@ -442,8 +450,10 @@ async def handle_list_tools() -> ListToolsResult:
                 "required": ["relation_id"]
             }
         ),
-        
-        # System Management Tools (5 tools)
+    ])
+    
+    # System Management Tools (5 tools)
+    tools.extend([
         Tool(
             name="get_pipeline_status",
             description="Get the pipeline status from LightRAG",
@@ -494,10 +504,21 @@ async def handle_list_tools() -> ListToolsResult:
                 "required": []
             }
         ),
-    ]
+    ])
     
-    logger.info(f"Listed {len(tools)} available MCP tools")
-    return ListToolsResult(tools=tools)
+    logger.info(f"Created {len(tools)} tools")
+    
+    # Simple validation like working server
+    for i, tool in enumerate(tools):
+        if not isinstance(tool, Tool):
+            raise ValueError(f"Tool {i} is not a Tool instance: {type(tool)}")
+        logger.info(f"Tool {i}: {tool.name} - OK")
+    
+    # Create result exactly like working server
+    result = ListToolsResult(tools=tools)
+    logger.info(f"ListToolsResult created successfully with {len(result.tools)} tools")
+    
+    return result
 
 
 @server.call_tool()

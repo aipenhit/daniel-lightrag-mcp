@@ -43,10 +43,12 @@ class TextDocument(BaseModel):
 
 class PaginationInfo(BaseModel):
     """Pagination information model."""
-    page: int = Field(1, ge=1, description="Page number")
-    page_size: int = Field(10, ge=1, le=100, description="Number of items per page")
-    total_pages: Optional[int] = None
-    total_items: Optional[int] = None
+    page: int = Field(..., description="Page number")
+    page_size: int = Field(..., description="Number of items per page")
+    total_count: int = Field(..., description="Total number of items")
+    total_pages: int = Field(..., description="Total number of pages")
+    has_next: bool = Field(..., description="Whether there is a next page")
+    has_prev: bool = Field(..., description="Whether there is a previous page")
 
 
 class ValidationError(BaseModel):
@@ -64,28 +66,32 @@ class HTTPValidationError(BaseModel):
 # Document Management Request Models
 class InsertTextRequest(BaseModel):
     """Request model for inserting a single text document."""
-    title: Optional[str] = None
-    content: str = Field(..., description="Text content to insert")
+    text: str = Field(..., description="Text content to insert")
+    file_source: str = Field(default="text_input.txt", description="Source file name for the text")
 
 
 class InsertTextsRequest(BaseModel):
     """Request model for inserting multiple text documents."""
-    texts: List[TextDocument] = Field(..., description="List of text documents to insert")
+    texts: List[str] = Field(..., description="List of text strings to insert")
+    file_sources: List[str] = Field(default_factory=list, description="List of file sources for the texts")
 
 
 class DeleteDocRequest(BaseModel):
     """Request model for deleting a document by ID."""
-    document_id: str = Field(..., description="ID of the document to delete")
+    doc_ids: List[str] = Field(..., description="List of document IDs to delete")
 
 
 class DeleteEntityRequest(BaseModel):
     """Request model for deleting an entity."""
     entity_id: str = Field(..., description="ID of the entity to delete")
+    entity_name: str = Field(..., description="Name of the entity to delete")
 
 
 class DeleteRelationRequest(BaseModel):
     """Request model for deleting a relation."""
     relation_id: str = Field(..., description="ID of the relation to delete")
+    source_entity: str = Field(..., description="Source entity name")
+    target_entity: str = Field(..., description="Target entity name")
 
 
 class DocumentsRequest(BaseModel):
@@ -113,13 +119,16 @@ class QueryRequest(BaseModel):
 class EntityUpdateRequest(BaseModel):
     """Request model for updating an entity."""
     entity_id: str = Field(..., description="ID of the entity to update")
-    properties: Dict[str, Any] = Field(..., description="Properties to update")
+    entity_name: str = Field(..., description="Name of the entity to update")
+    updated_data: Dict[str, Any] = Field(..., description="Updated data for the entity")
 
 
 class RelationUpdateRequest(BaseModel):
     """Request model for updating a relation."""
     relation_id: str = Field(..., description="ID of the relation to update")
-    properties: Dict[str, Any] = Field(..., description="Properties to update")
+    source_id: str = Field(..., description="Source entity ID")
+    target_id: str = Field(..., description="Target entity ID")
+    updated_data: Dict[str, Any] = Field(..., description="Updated data for the relation")
 
 
 class EntityExistsRequest(BaseModel):
@@ -137,23 +146,26 @@ class LoginRequest(BaseModel):
 # Document Management Response Models
 class InsertResponse(BaseModel):
     """Response model for document insertion."""
-    id: str = Field(..., description="Document ID")
     status: str = Field(..., description="Insertion status")
-    message: Optional[str] = None
+    message: str = Field(..., description="Status message")
+    track_id: str = Field(..., description="Tracking ID for the insertion")
+    id: Optional[str] = None
 
 
 class ScanResponse(BaseModel):
     """Response model for document scanning."""
-    scanned: int = Field(..., description="Number of documents scanned")
+    status: str = Field(..., description="Scanning status")
+    message: str = Field(..., description="Status message")
+    track_id: str = Field(..., description="Tracking ID for the scan operation")
     new_documents: List[str] = Field(default_factory=list, description="List of new document names")
     message: Optional[str] = None
 
 
 class UploadResponse(BaseModel):
     """Response model for file upload."""
-    filename: str = Field(..., description="Uploaded filename")
     status: str = Field(..., description="Upload status")
     message: Optional[str] = None
+    track_id: Optional[str] = Field(None, description="Track ID for upload")
 
 
 class DocumentInfo(BaseModel):
@@ -168,33 +180,42 @@ class DocumentInfo(BaseModel):
 
 class DocumentsResponse(BaseModel):
     """Response model for retrieving documents."""
-    documents: List[DocumentInfo] = Field(default_factory=list)
-    total: Optional[int] = None
+    statuses: Dict[str, Any] = Field(default_factory=dict, description="Document statuses")
 
 
 class PaginatedDocsResponse(BaseModel):
     """Response model for paginated documents."""
     documents: List[DocumentInfo] = Field(default_factory=list)
     pagination: PaginationInfo = Field(..., description="Pagination information")
+    status_counts: Dict[str, int] = Field(default_factory=dict, description="Status counts")
 
 
 class DeleteDocByIdResponse(BaseModel):
     """Response model for document deletion by ID."""
-    deleted: bool = Field(..., description="Whether deletion was successful")
-    document_id: str = Field(..., description="ID of the deleted document")
+    status: str = Field(..., description="Deletion status")
     message: Optional[str] = None
+    doc_id: Optional[str] = Field(None, description="ID of the deleted document")
 
 
 class ClearDocumentsResponse(BaseModel):
     """Response model for clearing all documents."""
-    cleared: bool = Field(..., description="Whether clearing was successful")
-    count: int = Field(..., description="Number of documents cleared")
+    status: str = Field(..., description="Clearing status")
     message: Optional[str] = None
 
 
 class PipelineStatusResponse(BaseModel):
     """Response model for pipeline status."""
-    status: PipelineStatus = Field(..., description="Pipeline status")
+    autoscanned: bool = Field(..., description="Whether auto-scanning is enabled")
+    busy: bool = Field(..., description="Whether pipeline is busy")
+    job_name: Optional[str] = None
+    job_start: Optional[str] = None
+    docs: Optional[int] = None
+    batchs: Optional[int] = None
+    cur_batch: Optional[int] = None
+    request_pending: Optional[bool] = None
+    latest_message: Optional[str] = None
+    history_messages: Optional[List[str]] = None
+    update_status: Optional[Dict[str, Any]] = None
     progress: Optional[float] = Field(None, ge=0, le=100, description="Progress percentage")
     current_task: Optional[str] = None
     message: Optional[str] = None
@@ -203,9 +224,9 @@ class PipelineStatusResponse(BaseModel):
 class TrackStatusResponse(BaseModel):
     """Response model for track status."""
     track_id: str = Field(..., description="Track ID")
-    status: str = Field(..., description="Track status")
-    progress: Optional[float] = Field(None, ge=0, le=100)
-    message: Optional[str] = None
+    documents: List[Dict[str, Any]] = Field(default_factory=list, description="Documents in track")
+    total_count: int = Field(0, description="Total document count")
+    status_summary: Dict[str, Any] = Field(default_factory=dict, description="Status summary")
 
 
 class StatusCountsResponse(BaseModel):
@@ -219,7 +240,8 @@ class StatusCountsResponse(BaseModel):
 
 class ClearCacheResponse(BaseModel):
     """Response model for cache clearing."""
-    cleared: bool = Field(..., description="Whether cache was cleared")
+    status: str = Field(..., description="Cache clearing status")
+    message: str = Field(..., description="Status message")
     cache_type: Optional[str] = None
     message: Optional[str] = None
 
@@ -243,8 +265,9 @@ class QueryResult(BaseModel):
 
 class QueryResponse(BaseModel):
     """Response model for text queries."""
-    query: str = Field(..., description="Original query")
-    results: List[QueryResult] = Field(default_factory=list)
+    response: str = Field(..., description="Query response text")
+    query: Optional[str] = None
+    results: Optional[List[QueryResult]] = None
     total_results: Optional[int] = None
     processing_time: Optional[float] = None
     context: Optional[str] = None
@@ -275,10 +298,19 @@ class RelationInfo(BaseModel):
 
 class GraphResponse(BaseModel):
     """Response model for knowledge graph."""
-    entities: List[EntityInfo] = Field(default_factory=list)
-    relations: List[RelationInfo] = Field(default_factory=list)
-    total_entities: Optional[int] = None
-    total_relations: Optional[int] = None
+    nodes: List[Dict[str, Any]] = Field(default_factory=list, description="Graph nodes (entities)")
+    edges: List[Dict[str, Any]] = Field(default_factory=list, description="Graph edges (relations)")
+    is_truncated: bool = Field(False, description="Whether the graph is truncated")
+    
+    @property
+    def entities(self) -> List[Dict[str, Any]]:
+        """Alias for nodes to maintain backward compatibility."""
+        return self.nodes
+    
+    @property
+    def relations(self) -> List[Dict[str, Any]]:
+        """Alias for edges to maintain backward compatibility."""
+        return self.edges
 
 
 class LabelsResponse(BaseModel):
@@ -290,22 +322,22 @@ class LabelsResponse(BaseModel):
 class EntityExistsResponse(BaseModel):
     """Response model for entity existence check."""
     exists: bool = Field(..., description="Whether entity exists")
-    entity_name: str = Field(..., description="Entity name")
+    entity_name: Optional[str] = None
     entity_id: Optional[str] = None
 
 
 class EntityUpdateResponse(BaseModel):
     """Response model for entity update."""
-    updated: bool = Field(..., description="Whether update was successful")
-    entity_id: str = Field(..., description="Entity ID")
-    message: Optional[str] = None
+    status: str = Field(..., description="Update status")
+    message: str = Field(..., description="Update message")
+    data: Dict[str, Any] = Field(..., description="Updated entity data")
 
 
 class RelationUpdateResponse(BaseModel):
     """Response model for relation update."""
-    updated: bool = Field(..., description="Whether update was successful")
-    relation_id: str = Field(..., description="Relation ID")
-    message: Optional[str] = None
+    status: str = Field(..., description="Update status")
+    message: str = Field(..., description="Update message")
+    data: Dict[str, Any] = Field(..., description="Updated relation data")
 
 
 # System Management Response Models

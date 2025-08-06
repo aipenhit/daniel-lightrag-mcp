@@ -161,7 +161,7 @@ class LightRAGClient:
                     response = await self.client.post(url, json=data)
             elif method.upper() == "DELETE":
                 if data:
-                    response = await self.client.delete(url, json=data)
+                    response = await self.client.request("DELETE", url, json=data)
                 else:
                     response = await self.client.delete(url)
             else:
@@ -263,7 +263,9 @@ class LightRAGClient:
         """Insert text content into LightRAG."""
         self.logger.info(f"Inserting text document with title: {title}")
         try:
-            request_data = InsertTextRequest(content=text, title=title)
+            # Use title as file_source if provided, otherwise use generic name
+            file_source = f"{title}.txt" if title else "text_input.txt"
+            request_data = InsertTextRequest(text=text, file_source=file_source)
             response_data = await self._make_request("POST", "/documents/text", request_data.model_dump())
             result = InsertResponse(**response_data)
             self.logger.info(f"Successfully inserted text document with ID: {result.id}")
@@ -279,7 +281,23 @@ class LightRAGClient:
     
     async def insert_texts(self, texts: List[TextDocument]) -> InsertResponse:
         """Insert multiple text documents into LightRAG."""
-        request_data = InsertTextsRequest(texts=texts)
+        # Convert TextDocument objects to strings (content only)
+        text_strings = []
+        for doc in texts:
+            if isinstance(doc, dict):
+                # Handle dict input from tests
+                text_strings.append(doc.get('content', str(doc)))
+            elif hasattr(doc, 'content'):
+                # Handle TextDocument objects
+                text_strings.append(doc.content)
+            else:
+                # Handle string input
+                text_strings.append(str(doc))
+        
+        # Create file sources for each text (use generic names to avoid null file_path)
+        file_sources = [f"text_input_{i+1}.txt" for i in range(len(text_strings))]
+        
+        request_data = InsertTextsRequest(texts=text_strings, file_sources=file_sources)
         response_data = await self._make_request("POST", "/documents/texts", request_data.model_dump())
         return InsertResponse(**response_data)
     
@@ -301,7 +319,7 @@ class LightRAGClient:
                 files = {"file": (os.path.basename(file_path), f, "application/octet-stream")}
                 response_data = await self._make_request("POST", "/documents/upload", files=files)
                 result = UploadResponse(**response_data)
-                self.logger.info(f"Successfully uploaded document: {result.filename} ({file_size} bytes)")
+                self.logger.info(f"Successfully uploaded document: {file_path} ({file_size} bytes) - Track ID: {result.track_id}")
                 return result
         except FileNotFoundError as e:
             error_msg = f"File not found: {file_path}"
@@ -336,7 +354,7 @@ class LightRAGClient:
     
     async def delete_document(self, document_id: str) -> DeleteDocByIdResponse:
         """Delete a document by ID from LightRAG."""
-        request_data = DeleteDocRequest(document_id=document_id)
+        request_data = DeleteDocRequest(doc_ids=[document_id])
         response_data = await self._make_request("DELETE", "/documents/delete_document", request_data.model_dump())
         return DeleteDocByIdResponse(**response_data)
     
@@ -397,43 +415,53 @@ class LightRAGClient:
     
     # Knowledge Graph Methods (8 methods)
     
-    async def get_knowledge_graph(self) -> GraphResponse:
+    async def get_knowledge_graph(self, label: str = "*") -> GraphResponse:
         """Retrieve the knowledge graph from LightRAG."""
-        response_data = await self._make_request("GET", "/graphs")
+        params = {"label": label}
+        response_data = await self._make_request("GET", "/graphs", params=params)
         return GraphResponse(**response_data)
     
     async def get_graph_labels(self) -> LabelsResponse:
         """Get labels for entities and relations in the knowledge graph."""
         response_data = await self._make_request("GET", "/graph/label/list")
+        # Server returns a list, but our model expects a dict with labels field
+        if isinstance(response_data, list):
+            response_data = {"labels": response_data}
         return LabelsResponse(**response_data)
     
     async def check_entity_exists(self, entity_name: str) -> EntityExistsResponse:
         """Check if an entity exists in the knowledge graph."""
-        params = {"entity_name": entity_name}
+        params = {"name": entity_name}
         response_data = await self._make_request("GET", "/graph/entity/exists", params=params)
         return EntityExistsResponse(**response_data)
     
-    async def update_entity(self, entity_id: str, properties: Dict[str, Any]) -> EntityUpdateResponse:
+    async def update_entity(self, entity_id: str, properties: Dict[str, Any], entity_name: Optional[str] = None) -> EntityUpdateResponse:
         """Update an entity in the knowledge graph."""
-        request_data = EntityUpdateRequest(entity_id=entity_id, properties=properties)
+        # Use entity_id as entity_name if not provided
+        if entity_name is None:
+            entity_name = entity_id
+        request_data = EntityUpdateRequest(entity_id=entity_id, entity_name=entity_name, updated_data=properties)
         response_data = await self._make_request("POST", "/graph/entity/edit", request_data.model_dump())
         return EntityUpdateResponse(**response_data)
     
-    async def update_relation(self, relation_id: str, properties: Dict[str, Any]) -> RelationUpdateResponse:
+    async def update_relation(self, relation_id: str, properties: Dict[str, Any], source_id: str = "unknown", target_id: str = "unknown") -> RelationUpdateResponse:
         """Update a relation in the knowledge graph."""
-        request_data = RelationUpdateRequest(relation_id=relation_id, properties=properties)
+        request_data = RelationUpdateRequest(relation_id=relation_id, source_id=source_id, target_id=target_id, updated_data=properties)
         response_data = await self._make_request("POST", "/graph/relation/edit", request_data.model_dump())
         return RelationUpdateResponse(**response_data)
     
-    async def delete_entity(self, entity_id: str) -> DeletionResult:
+    async def delete_entity(self, entity_id: str, entity_name: Optional[str] = None) -> DeletionResult:
         """Delete an entity from the knowledge graph."""
-        request_data = DeleteEntityRequest(entity_id=entity_id)
+        # Use entity_id as entity_name if not provided
+        if entity_name is None:
+            entity_name = entity_id
+        request_data = DeleteEntityRequest(entity_id=entity_id, entity_name=entity_name)
         response_data = await self._make_request("DELETE", "/documents/delete_entity", request_data.model_dump())
         return DeletionResult(**response_data)
     
-    async def delete_relation(self, relation_id: str) -> DeletionResult:
+    async def delete_relation(self, relation_id: str, source_entity: str = "unknown", target_entity: str = "unknown") -> DeletionResult:
         """Delete a relation from the knowledge graph."""
-        request_data = DeleteRelationRequest(relation_id=relation_id)
+        request_data = DeleteRelationRequest(relation_id=relation_id, source_entity=source_entity, target_entity=target_entity)
         response_data = await self._make_request("DELETE", "/documents/delete_relation", request_data.model_dump())
         return DeletionResult(**response_data)
     
