@@ -174,7 +174,7 @@ def _create_error_response(error: Exception, tool_name: str) -> CallToolResult:
 
 
 @server.list_tools()
-async def handle_list_tools() -> ListToolsResult:
+async def handle_list_tools() -> List[Tool]:#ListToolsResult:
     """List available tools."""
     logger.info("Listing available MCP tools")
     
@@ -518,7 +518,7 @@ async def handle_list_tools() -> ListToolsResult:
     result = ListToolsResult(tools=tools)
     logger.info(f"ListToolsResult created successfully with {len(result.tools)} tools")
     
-    return result
+    return tools
 
 
 @server.call_tool()
