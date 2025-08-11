@@ -5,6 +5,7 @@ MCP server for LightRAG integration.
 import asyncio
 import json
 import logging
+import os
 from typing import Any, Dict, List, Optional, Sequence
 from mcp.server import Server, NotificationOptions
 from mcp.server.models import InitializationOptions
@@ -116,16 +117,140 @@ def _serialize_result(result: Any) -> str:
         return json.dumps(result, indent=2)
 
 
-def _create_success_response(result: Any, tool_name: str) -> CallToolResult:
+def _create_success_response(result: Any, tool_name: str) -> dict:
     """Create standardized MCP success response."""
-    logger.info(f"Successfully executed {tool_name}")
-    return CallToolResult(
-        content=[TextContent(type="text", text=_serialize_result(result))]
-    )
+    logger.info("=" * 60)
+    logger.info("CREATING SUCCESS RESPONSE")
+    logger.info("=" * 60)
+    logger.info(f"SUCCESS RESPONSE INPUT:")
+    logger.info(f"  - tool_name: '{tool_name}'")
+    logger.info(f"  - result type: {type(result)}")
+    logger.info(f"  - result content: {repr(result)}")
+    
+    # Handle Pydantic models properly
+    logger.info("RESPONSE SERIALIZATION:")
+    if hasattr(result, 'model_dump'):
+        logger.info("  - Using result.model_dump() (Pydantic v2)")
+        try:
+            serialized_data = result.model_dump()
+            logger.info(f"  - model_dump() result: {serialized_data}")
+            response_text = json.dumps(serialized_data, indent=2)
+            logger.info(f"  - JSON serialization successful")
+        except Exception as e:
+            logger.error(f"  - model_dump() failed: {e}")
+            response_text = str(result)
+    elif hasattr(result, 'dict'):
+        logger.info("  - Using result.dict() (Pydantic v1)")
+        try:
+            serialized_data = result.dict()
+            logger.info(f"  - dict() result: {serialized_data}")
+            response_text = json.dumps(serialized_data, indent=2)
+            logger.info(f"  - JSON serialization successful")
+        except Exception as e:
+            logger.error(f"  - dict() failed: {e}")
+            response_text = str(result)
+    elif result:
+        logger.info("  - Direct JSON serialization")
+        try:
+            response_text = json.dumps(result, indent=2)
+            logger.info(f"  - Direct JSON serialization successful")
+        except Exception as e:
+            logger.error(f"  - Direct JSON serialization failed: {e}")
+            response_text = str(result)
+    else:
+        logger.info("  - Result is None/empty, using 'Success'")
+        response_text = "Success"
+    
+    logger.info(f"FINAL RESPONSE TEXT:")
+    logger.info(f"  - Length: {len(response_text)} characters")
+    logger.info(f"  - Content preview: {response_text[:200]}{'...' if len(response_text) > 200 else ''}")
+    
+    # Create response dictionary
+    response_dict = {
+        "content": [
+            {
+                "type": "text",
+                "text": response_text
+            }
+        ]
+    }
+    
+    logger.info(f"SUCCESS RESPONSE CREATED:")
+    logger.info(f"  - Response type: {type(response_dict)}")
+    logger.info(f"  - Response keys: {list(response_dict.keys())}")
+    logger.info(f"  - Content length: {len(response_dict['content'])}")
+    logger.info(f"  - Content[0] type: {response_dict['content'][0]['type']}")
+    logger.info(f"  - Content[0] text length: {len(response_dict['content'][0]['text'])}")
+    logger.info("=" * 60)
+    
+    return response_dict
+
+# def _create_success_response(result: Any, tool_name: str) -> CallToolResult:
+#     """Create standardized MCP success response."""
+#     logger.info(f"Successfully executed {tool_name}")
+#     return CallToolResult(
+#         content=[TextContent(type="text", text=_serialize_result(result))]
+#     )
+# def _create_success_response(result: Any, tool_name: str) -> CallToolResult:
+#     """Create standardized MCP success response."""
+#     logger.info(f"Successfully executed {tool_name}")
+    
+#     # Simple text response format
+#     # response_text = json.dumps(result, indent=2) if result else "Success"
+
+#     # Handle Pydantic models properly
+#     if hasattr(result, 'model_dump'):
+#         # Pydantic v2
+#         response_text = json.dumps(result.model_dump(), indent=2)
+#     elif hasattr(result, 'dict'):
+#         # Pydantic v1
+#         response_text = json.dumps(result.dict(), indent=2)
+#     elif result:
+#         response_text = json.dumps(result, indent=2)
+#     else:
+#         response_text = "Success"
+
+    
+#     return CallToolResult(
+#         content=[TextContent(type="text", text=response_text)]
+#     )
+# def _create_success_response(result: Any, tool_name: str) -> CallToolResult:
+#     """Create standardized MCP success response."""
+#     logger.info(f"Successfully executed {tool_name}")
+    
+#     # Handle Pydantic models properly
+#     if hasattr(result, 'model_dump'):
+#         response_text = json.dumps(result.model_dump(), indent=2)
+#     elif hasattr(result, 'dict'):
+#         response_text = json.dumps(result.dict(), indent=2)
+#     elif result:
+#         response_text = json.dumps(result, indent=2)
+#     else:
+#         response_text = "Success"
+    
+#     # Create TextContent object explicitly
+#     text_content = TextContent(type="text", text=response_text)
+    
+#     # Return CallToolResult with explicit parameters
+#     return CallToolResult(content=[text_content])
 
 
-def _create_error_response(error: Exception, tool_name: str) -> CallToolResult:
+def _create_error_response(error: Exception, tool_name: str) -> dict:
     """Create standardized MCP error response."""
+    logger.error("=" * 60)
+    logger.error("CREATING ERROR RESPONSE")
+    logger.error("=" * 60)
+    logger.error(f"ERROR RESPONSE INPUT:")
+    logger.error(f"  - tool_name: '{tool_name}'")
+    logger.error(f"  - error type: {type(error)}")
+    logger.error(f"  - error message: {str(error)}")
+    logger.error(f"  - error args: {error.args}")
+    
+    # Get full traceback
+    import traceback
+    logger.error(f"ERROR TRACEBACK:")
+    logger.error(f"  - Full traceback: {traceback.format_exc()}")
+    
     error_details = {
         "tool": tool_name,
         "error_type": type(error).__name__,
@@ -133,9 +258,19 @@ def _create_error_response(error: Exception, tool_name: str) -> CallToolResult:
         "timestamp": asyncio.get_event_loop().time()
     }
     
+    logger.error(f"BASE ERROR DETAILS:")
+    logger.error(f"  - error_details: {error_details}")
+    
     # Add additional details for LightRAG errors
     if isinstance(error, LightRAGError):
-        error_details.update(error.to_dict())
+        logger.error("LIGHTRAG ERROR DETECTED:")
+        logger.error(f"  - LightRAG error type: {type(error)}")
+        try:
+            error_dict = error.to_dict()
+            logger.error(f"  - error.to_dict(): {error_dict}")
+            error_details.update(error_dict)
+        except Exception as e:
+            logger.error(f"  - error.to_dict() failed: {e}")
         
         # Log different error types at appropriate levels with structured context
         error_context = {
@@ -144,6 +279,8 @@ def _create_error_response(error: Exception, tool_name: str) -> CallToolResult:
             "status_code": getattr(error, 'status_code', None),
             "response_data": getattr(error, 'response_data', {})
         }
+        
+        logger.error(f"ERROR CONTEXT: {error_context}")
         
         if isinstance(error, (LightRAGConnectionError, LightRAGTimeoutError)):
             logger.warning(f"Connection/timeout error in {tool_name}: {error}", extra=error_context)
@@ -156,21 +293,44 @@ def _create_error_response(error: Exception, tool_name: str) -> CallToolResult:
         else:
             logger.error(f"API error in {tool_name}: {error}", extra=error_context)
     else:
+        logger.error("NON-LIGHTRAG ERROR:")
         # Handle Pydantic validation errors specifically
         if hasattr(error, 'errors') and callable(getattr(error, 'errors')):
+            logger.error("  - Pydantic validation error detected")
             try:
                 validation_errors = error.errors()
+                logger.error(f"  - validation_errors: {validation_errors}")
                 error_details["validation_errors"] = validation_errors
                 logger.warning(f"Input validation error in {tool_name}: {validation_errors}")
-            except:
+            except Exception as e:
+                logger.error(f"  - error.errors() failed: {e}")
                 logger.error(f"Unexpected error in {tool_name}: {error}")
         else:
+            logger.error(f"  - Generic error: {error}")
             logger.error(f"Unexpected error in {tool_name}: {error}")
     
-    return CallToolResult(
-        content=[TextContent(type="text", text=json.dumps(error_details, indent=2))],
-        isError=True
-    )
+    logger.error(f"FINAL ERROR DETAILS:")
+    logger.error(f"  - error_details: {error_details}")
+    
+    # Create error response dictionary
+    error_response = {
+        "content": [
+            {
+                "type": "text",
+                "text": json.dumps(error_details, indent=2)
+            }
+        ],
+        "isError": True
+    }
+    
+    logger.error(f"ERROR RESPONSE CREATED:")
+    logger.error(f"  - Response type: {type(error_response)}")
+    logger.error(f"  - Response keys: {list(error_response.keys())}")
+    logger.error(f"  - isError: {error_response['isError']}")
+    logger.error(f"  - Content length: {len(error_response['content'])}")
+    logger.error("=" * 60)
+    
+    return error_response
 
 
 @server.list_tools()
@@ -520,33 +680,120 @@ async def handle_list_tools() -> List[Tool]:#ListToolsResult:
     
     return tools
 
-
 @server.call_tool()
-async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
+async def handle_call_tool(self, request: CallToolRequest) -> dict:
     """Handle tool calls."""
     global lightrag_client
     
-    # Extract tool name and arguments from params
-    tool_name = request.params.name
-    arguments = request.params.arguments or {}
+    # === COMPREHENSIVE LOGGING START ===
+    logger.info("=" * 80)
+    logger.info("MCP TOOL CALL HANDLER STARTED")
+    logger.info("=" * 80)
     
-    logger.info(f"Handling tool call: {tool_name}")
-    logger.debug(f"Tool arguments: {json.dumps(arguments, indent=2)}")
+    # Log all incoming parameters with full details
+    logger.info(f"HANDLER INPUT ANALYSIS:")
+    logger.info(f"  - self type: {type(self)}")
+    logger.info(f"  - self content: {repr(self)}")
+    logger.info(f"  - self length: {len(str(self)) if isinstance(self, str) else 'N/A'}")
+    logger.info(f"  - request type: {type(request)}")
+    logger.info(f"  - request content: {repr(request)}")
     
+    # Check all attributes of self and request
+    if hasattr(self, '__dict__'):
+        logger.info(f"  - self.__dict__: {self.__dict__}")
+    else:
+        logger.info(f"  - self has no __dict__ attribute")
+        
+    if hasattr(request, '__dict__'):
+        logger.info(f"  - request.__dict__: {request.__dict__}")
+    else:
+        logger.info(f"  - request has no __dict__ attribute")
+        
+    # Log request attributes if it's a dict
+    if isinstance(request, dict):
+        logger.info(f"  - request keys: {list(request.keys())}")
+        logger.info(f"  - request values: {list(request.values())}")
+        for key, value in request.items():
+            logger.info(f"    - request['{key}'] = {repr(value)} (type: {type(value)})")
+    
+    # The MCP library passes tool_name as 'self' and empty dict as 'request'
+    tool_name = self  # self is the tool name string
+    arguments = {}   # arguments are always empty for now
+    
+    logger.info(f"EXTRACTED PARAMETERS:")
+    logger.info(f"  - tool_name: '{tool_name}' (type: {type(tool_name)})")
+    logger.info(f"  - arguments: {arguments} (type: {type(arguments)})")
+    logger.info(f"  - arguments length: {len(arguments)}")
+    
+    # Log global client state
+    logger.info(f"GLOBAL CLIENT STATE:")
+    logger.info(f"  - lightrag_client is None: {lightrag_client is None}")
+    if lightrag_client is not None:
+        logger.info(f"  - lightrag_client type: {type(lightrag_client)}")
+        logger.info(f"  - lightrag_client base_url: {getattr(lightrag_client, 'base_url', 'N/A')}")
+    
+    logger.info("=" * 80)
+
+
+
+    
+    logger.info(f"TOOL EXECUTION PHASE:")
+    logger.info(f"  - Processing tool: '{tool_name}'")
+    logger.info(f"  - Tool arguments: {json.dumps(arguments, indent=2)}")
+    
+    # Client initialization with detailed logging
     if lightrag_client is None:
-        logger.info("Initializing LightRAG client")
+        logger.info("CLIENT INITIALIZATION:")
+        logger.info("  - LightRAG client is None, initializing new client")
         try:
-            lightrag_client = LightRAGClient()
+            logger.info("  - Creating LightRAGClient instance...")
+            
+            # Get configuration from environment variables
+            base_url = os.getenv("LIGHTRAG_BASE_URL", "http://localhost:9621")
+            api_key = os.getenv("LIGHTRAG_API_KEY", None)
+            timeout = float(os.getenv("LIGHTRAG_TIMEOUT", "30.0"))
+            
+            logger.info("CLIENT CONFIGURATION:")
+            logger.info(f"  - base_url: {base_url}")
+            logger.info(f"  - api_key: {'***REDACTED***' if api_key else 'None'}")
+            logger.info(f"  - timeout: {timeout}")
+            
+            lightrag_client = LightRAGClient(
+                base_url=base_url,
+                api_key=api_key,
+                timeout=timeout
+            )
+            logger.info(f"  - Client initialized successfully: {type(lightrag_client)}")
+            logger.info(f"  - Client base_url: {lightrag_client.base_url}")
+            logger.info(f"  - Client timeout: {lightrag_client.timeout}")
+            logger.info(f"  - Client has API key: {lightrag_client.api_key is not None}")
         except Exception as e:
-            logger.error(f"Failed to initialize LightRAG client: {e}")
+            logger.error(f"CLIENT INITIALIZATION FAILED:")
+            logger.error(f"  - Exception type: {type(e)}")
+            logger.error(f"  - Exception message: {str(e)}")
+            logger.error(f"  - Exception args: {e.args}")
+            import traceback
+            logger.error(f"  - Full traceback: {traceback.format_exc()}")
             return _create_error_response(
                 LightRAGConnectionError(f"Failed to initialize LightRAG client: {str(e)}"),
                 tool_name
             )
+    else:
+        logger.info("CLIENT STATE:")
+        logger.info(f"  - Using existing LightRAG client: {type(lightrag_client)}")
+        logger.info(f"  - Client base_url: {lightrag_client.base_url}")
     
     try:
+        logger.info("ARGUMENT VALIDATION:")
+        logger.info(f"  - Validating arguments for tool: {tool_name}")
+        logger.info(f"  - Arguments to validate: {arguments}")
+        
         # Validate that required arguments are present for each tool
         _validate_tool_arguments(tool_name, arguments)
+        logger.info("  - Argument validation passed")
+        
+        logger.info("TOOL DISPATCH:")
+        logger.info(f"  - Dispatching to tool handler for: {tool_name}")
         
         # Document Management Tools (8 tools)
         if tool_name == "insert_text":
@@ -585,12 +832,73 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
         
         # Query Tools (2 tools)
         elif tool_name == "query_text":
+            logger.info("EXECUTING QUERY_TEXT TOOL:")
+            logger.info(f"  - Tool: {tool_name}")
+            logger.info(f"  - Client type: {type(lightrag_client)}")
+            logger.info(f"  - Client base_url: {lightrag_client.base_url}")
+            logger.info(f"  - Raw arguments: {arguments}")
+            
+            # Extract and validate parameters
+            query = arguments.get("query", "")
             mode = arguments.get("mode", "hybrid")
             only_need_context = arguments.get("only_need_context", False)
-            result = await lightrag_client.query_text(
-                arguments["query"], mode=mode, only_need_context=only_need_context
-            )
-            return _create_success_response(result, tool_name)
+            
+            logger.info(f"QUERY_TEXT PARAMETERS:")
+            logger.info(f"  - query: '{query}' (length: {len(query)})")
+            logger.info(f"  - mode: '{mode}'")
+            logger.info(f"  - only_need_context: {only_need_context}")
+            logger.info(f"  - query type: {type(query)}")
+            
+            # Validate query
+            if not query or not query.strip():
+                logger.error("QUERY_TEXT VALIDATION ERROR:")
+                logger.error("  - Query is empty or whitespace only")
+                raise LightRAGValidationError("Query cannot be empty")
+            
+            valid_modes = ["naive", "local", "global", "hybrid"]
+            if mode not in valid_modes:
+                logger.error("QUERY_TEXT MODE ERROR:")
+                logger.error(f"  - Invalid mode: '{mode}'")
+                logger.error(f"  - Valid modes: {valid_modes}")
+                raise LightRAGValidationError(f"Invalid query mode '{mode}'. Must be one of: {valid_modes}")
+            
+            logger.info("  - Parameter validation passed")
+            logger.info("  - Calling lightrag_client.query_text()...")
+            
+            try:
+                result = await lightrag_client.query_text(
+                    query, mode=mode, only_need_context=only_need_context
+                )
+                logger.info("QUERY_TEXT SUCCESS:")
+                logger.info(f"  - Result type: {type(result)}")
+                logger.info(f"  - Result content: {repr(result)}")
+                if hasattr(result, '__dict__'):
+                    logger.info(f"  - Result.__dict__: {result.__dict__}")
+                if hasattr(result, 'model_dump'):
+                    try:
+                        result_dump = result.model_dump()
+                        logger.info(f"  - Result.model_dump(): {result_dump}")
+                        logger.info(f"  - Response length: {len(str(result_dump.get('response', '')))}")
+                        logger.info(f"  - Results count: {len(result_dump.get('results', []))}")
+                    except Exception as e:
+                        logger.error(f"  - model_dump() failed: {e}")
+                
+                logger.info("  - Calling _create_success_response()...")
+                response = _create_success_response(result, tool_name)
+                logger.info(f"  - Success response type: {type(response)}")
+                logger.info(f"  - Success response keys: {list(response.keys())}")
+                return response
+            except Exception as e:
+                logger.error("QUERY_TEXT FAILED:")
+                logger.error(f"  - Exception type: {type(e)}")
+                logger.error(f"  - Exception message: {str(e)}")
+                logger.error(f"  - Exception args: {e.args}")
+                logger.error(f"  - Query: '{query}'")
+                logger.error(f"  - Mode: '{mode}'")
+                logger.error(f"  - Only need context: {only_need_context}")
+                import traceback
+                logger.error(f"  - Full traceback: {traceback.format_exc()}")
+                raise
         
         elif tool_name == "query_text_stream":
             mode = arguments.get("mode", "hybrid")
@@ -644,8 +952,58 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
         
         # System Management Tools (5 tools)
         elif tool_name == "get_pipeline_status":
-            result = await lightrag_client.get_pipeline_status()
-            return _create_success_response(result, tool_name)
+            logger.info("EXECUTING GET_PIPELINE_STATUS TOOL:")
+            logger.info(f"  - Tool: {tool_name}")
+            logger.info(f"  - Client type: {type(lightrag_client)}")
+            logger.info(f"  - Client base_url: {lightrag_client.base_url}")
+            logger.info(f"  - Arguments: {arguments}")
+            logger.info(f"  - Arguments length: {len(arguments)}")
+            logger.info("  - This tool requires no parameters")
+            logger.info("  - Calling lightrag_client.get_pipeline_status()...")
+            
+            try:
+                result = await lightrag_client.get_pipeline_status()
+                logger.info("GET_PIPELINE_STATUS SUCCESS:")
+                logger.info(f"  - Result type: {type(result)}")
+                logger.info(f"  - Result content: {repr(result)}")
+                if hasattr(result, '__dict__'):
+                    logger.info(f"  - Result.__dict__: {result.__dict__}")
+                if hasattr(result, 'model_dump'):
+                    try:
+                        result_dump = result.model_dump()
+                        logger.info(f"  - Result.model_dump(): {result_dump}")
+                        logger.info(f"PIPELINE STATUS DETAILS:")
+                        logger.info(f"    - autoscanned: {result_dump.get('autoscanned', 'N/A')}")
+                        logger.info(f"    - busy: {result_dump.get('busy', 'N/A')}")
+                        logger.info(f"    - job_name: {result_dump.get('job_name', 'N/A')}")
+                        logger.info(f"    - job_start: {result_dump.get('job_start', 'N/A')}")
+                        logger.info(f"    - docs: {result_dump.get('docs', 'N/A')}")
+                        logger.info(f"    - batchs: {result_dump.get('batchs', 'N/A')}")
+                        logger.info(f"    - cur_batch: {result_dump.get('cur_batch', 'N/A')}")
+                        logger.info(f"    - request_pending: {result_dump.get('request_pending', 'N/A')}")
+                        logger.info(f"    - progress: {result_dump.get('progress', 'N/A')}")
+                        logger.info(f"    - current_task: {result_dump.get('current_task', 'N/A')}")
+                        logger.info(f"    - latest_message: {result_dump.get('latest_message', 'N/A')}")
+                        history_messages = result_dump.get('history_messages', [])
+                        logger.info(f"    - history_messages count: {len(history_messages) if history_messages else 0}")
+                        if history_messages:
+                            logger.info(f"    - latest history message: {history_messages[-1] if history_messages else 'N/A'}")
+                    except Exception as e:
+                        logger.error(f"  - model_dump() failed: {e}")
+                
+                logger.info("  - Calling _create_success_response()...")
+                response = _create_success_response(result, tool_name)
+                logger.info(f"  - Success response type: {type(response)}")
+                logger.info(f"  - Success response keys: {list(response.keys())}")
+                return response
+            except Exception as e:
+                logger.error("GET_PIPELINE_STATUS FAILED:")
+                logger.error(f"  - Exception type: {type(e)}")
+                logger.error(f"  - Exception message: {str(e)}")
+                logger.error(f"  - Exception args: {e.args}")
+                import traceback
+                logger.error(f"  - Full traceback: {traceback.format_exc()}")
+                raise
         
         elif tool_name == "get_track_status":
             result = await lightrag_client.get_track_status(arguments["track_id"])
@@ -660,8 +1018,34 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
             return _create_success_response(result, tool_name)
         
         elif tool_name == "get_health":
-            result = await lightrag_client.get_health()
-            return _create_success_response(result, tool_name)
+            logger.info("EXECUTING GET_HEALTH TOOL:")
+            logger.info(f"  - Tool: {tool_name}")
+            logger.info(f"  - Client type: {type(lightrag_client)}")
+            logger.info(f"  - Client base_url: {lightrag_client.base_url}")
+            logger.info("  - Calling lightrag_client.get_health()...")
+            
+            try:
+                result = await lightrag_client.get_health()
+                logger.info("GET_HEALTH SUCCESS:")
+                logger.info(f"  - Result type: {type(result)}")
+                logger.info(f"  - Result content: {repr(result)}")
+                if hasattr(result, '__dict__'):
+                    logger.info(f"  - Result.__dict__: {result.__dict__}")
+                if hasattr(result, 'model_dump'):
+                    logger.info(f"  - Result.model_dump(): {result.model_dump()}")
+                logger.info("  - Calling _create_success_response()...")
+                response = _create_success_response(result, tool_name)
+                logger.info(f"  - Success response type: {type(response)}")
+                logger.info(f"  - Success response: {response}")
+                return response
+            except Exception as e:
+                logger.error("GET_HEALTH FAILED:")
+                logger.error(f"  - Exception type: {type(e)}")
+                logger.error(f"  - Exception message: {str(e)}")
+                logger.error(f"  - Exception args: {e.args}")
+                import traceback
+                logger.error(f"  - Full traceback: {traceback.format_exc()}")
+                raise
         
         else:
             error_msg = f"Unknown tool: {tool_name}"
@@ -672,58 +1056,122 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
             )
     
     except LightRAGError as e:
+        logger.error("LIGHTRAG EXCEPTION CAUGHT:")
+        logger.error(f"  - Exception type: {type(e)}")
+        logger.error(f"  - Exception message: {str(e)}")
+        logger.error(f"  - Tool name: {tool_name}")
+        logger.error(f"  - Status code: {getattr(e, 'status_code', 'N/A')}")
+        logger.error(f"  - Response data: {getattr(e, 'response_data', 'N/A')}")
+        import traceback
+        logger.error(f"  - Traceback: {traceback.format_exc()}")
         return _create_error_response(e, tool_name)
     
     except Exception as e:
+        logger.error("GENERIC EXCEPTION CAUGHT:")
+        logger.error(f"  - Exception type: {type(e)}")
+        logger.error(f"  - Exception message: {str(e)}")
+        logger.error(f"  - Exception args: {e.args}")
+        logger.error(f"  - Tool name: {tool_name}")
+        import traceback
+        logger.error(f"  - Traceback: {traceback.format_exc()}")
         return _create_error_response(e, tool_name)
 
 
 async def main():
     """Main entry point for the MCP server."""
-    logger.info("Starting LightRAG MCP server")
+    logger.info("=" * 100)
+    logger.info("STARTING LIGHTRAG MCP SERVER")
+    logger.info("=" * 100)
+    
+    # Log system information
+    import sys
+    import platform
+    logger.info("SYSTEM INFORMATION:")
+    logger.info(f"  - Python version: {sys.version}")
+    logger.info(f"  - Platform: {platform.platform()}")
+    logger.info(f"  - Current working directory: {os.getcwd()}")
+    logger.info(f"  - Script path: {__file__}")
+    
+    # Log environment variables
+    logger.info("ENVIRONMENT VARIABLES:")
+    for key, value in os.environ.items():
+        if 'LIGHTRAG' in key.upper() or 'MCP' in key.upper():
+            logger.info(f"  - {key}: {value}")
     
     try:
-        # Test basic server configuration
-        logger.info("Validating server configuration...")
+        logger.info("SERVER INITIALIZATION:")
+        logger.info("  - Validating server configuration...")
+        logger.info(f"  - Server name: daniel-lightrag-mcp")
+        logger.info(f"  - Server object: {server}")
+        logger.info(f"  - Server type: {type(server)}")
         
+        logger.info("STDIO SERVER SETUP:")
         async with stdio_server() as (read_stream, write_stream):
-            logger.info("MCP server initialized, starting communication loop")
+            logger.info("  - STDIO server context entered successfully")
+            logger.info(f"  - Read stream: {read_stream}")
+            logger.info(f"  - Write stream: {write_stream}")
+            logger.info("  - MCP server initialized, starting communication loop")
             
             # Initialize server capabilities
+            logger.info("CAPABILITIES INITIALIZATION:")
             capabilities = server.get_capabilities(
                 notification_options=NotificationOptions(),
                 experimental_capabilities={},
             )
-            logger.debug(f"Server capabilities: {capabilities}")
+            logger.info(f"  - Server capabilities: {capabilities}")
+            logger.info(f"  - Capabilities type: {type(capabilities)}")
             
+            # Create initialization options
+            init_options = InitializationOptions(
+                server_name="daniel-lightrag-mcp",
+                server_version="0.1.0",
+                capabilities=capabilities,
+            )
+            logger.info(f"INITIALIZATION OPTIONS:")
+            logger.info(f"  - Init options: {init_options}")
+            logger.info(f"  - Init options type: {type(init_options)}")
+            
+            logger.info("STARTING SERVER RUN LOOP:")
             await server.run(
                 read_stream,
                 write_stream,
-                InitializationOptions(
-                    server_name="daniel-lightrag-mcp",
-                    server_version="0.1.0",
-                    capabilities=capabilities,
-                ),
+                init_options,
             )
+            
     except KeyboardInterrupt:
-        logger.info("Server shutdown requested by user")
+        logger.info("SERVER SHUTDOWN:")
+        logger.info("  - Server shutdown requested by user (KeyboardInterrupt)")
     except ConnectionError as e:
-        logger.error(f"Connection error during server startup: {e}")
+        logger.error("CONNECTION ERROR:")
+        logger.error(f"  - Connection error during server startup: {e}")
+        logger.error(f"  - Error type: {type(e)}")
+        logger.error(f"  - Error args: {e.args}")
+        import traceback
+        logger.error(f"  - Traceback: {traceback.format_exc()}")
         raise
     except Exception as e:
-        logger.error(f"Fatal server error: {e}")
+        logger.error("FATAL SERVER ERROR:")
+        logger.error(f"  - Fatal server error: {e}")
+        logger.error(f"  - Error type: {type(e)}")
+        logger.error(f"  - Error args: {e.args}")
         import traceback
-        logger.error(f"Traceback: {traceback.format_exc()}")
+        logger.error(f"  - Traceback: {traceback.format_exc()}")
         raise
     finally:
-        logger.info("LightRAG MCP server shutting down")
+        logger.info("SERVER CLEANUP:")
+        logger.info("  - LightRAG MCP server shutting down")
         global lightrag_client
         if lightrag_client:
+            logger.info("  - Closing LightRAG client...")
             try:
                 await lightrag_client.__aexit__(None, None, None)
-                logger.info("LightRAG client closed successfully")
+                logger.info("  - LightRAG client closed successfully")
             except Exception as e:
-                logger.warning(f"Error closing LightRAG client: {e}")
+                logger.warning(f"  - Error closing LightRAG client: {e}")
+                logger.warning(f"  - Error type: {type(e)}")
+        else:
+            logger.info("  - No LightRAG client to close")
+        logger.info("=" * 100)
 
 
 if __name__ == "__main__":
