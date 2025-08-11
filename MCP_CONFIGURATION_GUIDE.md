@@ -14,11 +14,14 @@ Add to your MCP client configuration:
 {
   "mcpServers": {
     "daniel-lightrag": {
-      "command": "python",
-      "args": ["-m", "daniel_lightrag_mcp"],
+      "command": "python3",
+      "args": [
+        "-m",
+        "daniel_lightrag_mcp"
+      ],
       "env": {
         "LIGHTRAG_BASE_URL": "http://localhost:9621",
-        "LIGHTRAG_API_KEY": "lightragsecretkey"
+        "LIGHTRAG_API_KEY": "Insert-LightRAG-API-Key-Here"
       }
     }
   }
@@ -60,7 +63,7 @@ Use the `get_health` tool to verify connectivity:
       "args": ["-m", "daniel_lightrag_mcp"],
       "env": {
         "LIGHTRAG_BASE_URL": "http://localhost:9621",
-        "LIGHTRAG_API_KEY": "lightragsecretkey",
+        "LIGHTRAG_API_KEY": "Insert-LightRAG-API-Key-Here",
         "LIGHTRAG_TIMEOUT": "30",
         "LOG_LEVEL": "INFO"
       }
@@ -83,7 +86,7 @@ For other MCP-compatible clients, use the same basic structure:
       "args": ["-m", "daniel_lightrag_mcp"],
       "environment": {
         "LIGHTRAG_BASE_URL": "http://localhost:9621",
-        "LIGHTRAG_API_KEY": "lightragsecretkey"
+        "LIGHTRAG_API_KEY": "Insert-LightRAG-API-Key-Here"
       }
     }
   }
@@ -113,7 +116,7 @@ For other MCP-compatible clients, use the same basic structure:
 **macOS/Linux:**
 ```bash
 export LIGHTRAG_BASE_URL="http://localhost:9621"
-export LIGHTRAG_API_KEY="lightragsecretkey"
+export LIGHTRAG_API_KEY="Insert-LightRAG-API-Key-Here"
 export LOG_LEVEL="DEBUG"
 ```
 
@@ -133,7 +136,7 @@ set LOG_LEVEL=DEBUG
       "args": ["-m", "daniel_lightrag_mcp"],
       "env": {
         "LIGHTRAG_BASE_URL": "http://localhost:9621",
-        "LIGHTRAG_API_KEY": "lightragsecretkey",
+        "LIGHTRAG_API_KEY": "Insert-LightRAG-API-Key-Here",
         "LIGHTRAG_TIMEOUT": "30",
         "LOG_LEVEL": "INFO"
       }
@@ -158,7 +161,7 @@ If installed in a custom location:
       "env": {
         "PYTHONPATH": "/path/to/installation",
         "LIGHTRAG_BASE_URL": "http://localhost:9621",
-        "LIGHTRAG_API_KEY": "lightragsecretkey"
+        "LIGHTRAG_API_KEY": "Insert-LightRAG-API-Key-Here"
       }
     }
   }
@@ -177,7 +180,7 @@ Using a virtual environment:
       "args": ["-m", "daniel_lightrag_mcp"],
       "env": {
         "LIGHTRAG_BASE_URL": "http://localhost:9621",
-        "LIGHTRAG_API_KEY": "lightragsecretkey"
+        "LIGHTRAG_API_KEY": "Insert-LightRAG-API-Key-Here"
       }
     }
   }
@@ -223,7 +226,7 @@ For development with debug logging:
       "args": ["-m", "daniel_lightrag_mcp"],
       "env": {
         "LIGHTRAG_BASE_URL": "http://localhost:9621",
-        "LIGHTRAG_API_KEY": "lightragsecretkey",
+        "LIGHTRAG_API_KEY": "Insert-LightRAG-API-Key-Here",
         "LOG_LEVEL": "DEBUG",
         "LIGHTRAG_TIMEOUT": "60"
       }
@@ -339,7 +342,7 @@ Enable debug mode:
       "args": ["-m", "daniel_lightrag_mcp"],
       "env": {
         "LIGHTRAG_BASE_URL": "http://localhost:9621",
-        "LIGHTRAG_API_KEY": "lightragsecretkey",
+        "LIGHTRAG_API_KEY": "Insert-LightRAG-API-Key-Here",
         "LOG_LEVEL": "DEBUG"
       }
     }
@@ -358,7 +361,7 @@ python -c "import daniel_lightrag_mcp; print('OK')"
 curl http://localhost:9621/health
 
 # Test with API key
-curl -H "Authorization: Bearer lightragsecretkey" http://localhost:9621/health
+curl -H "Authorization: Bearer Insert-LightRAG-API-Key-Here" http://localhost:9621/health
 
 # Test MCP server startup
 python -m daniel_lightrag_mcp &
