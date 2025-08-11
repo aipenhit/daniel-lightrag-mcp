@@ -718,7 +718,7 @@ async def handle_call_tool(self, request: CallToolRequest) -> dict:
     
     # The MCP library passes tool_name as 'self' and empty dict as 'request'
     tool_name = self  # self is the tool name string
-    arguments = {}   # arguments are always empty for now
+    arguments = request or {}   # arguments are always empty for now
     
     logger.info(f"EXTRACTED PARAMETERS:")
     logger.info(f"  - tool_name: '{tool_name}' (type: {type(tool_name)})")
