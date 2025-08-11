@@ -125,7 +125,7 @@ class EntityUpdateRequest(BaseModel):
 
 class RelationUpdateRequest(BaseModel):
     """Request model for updating a relation."""
-    relation_id: str = Field(..., description="ID of the relation to update")
+    # relation_id: str = Field(..., description="ID of the relation to update")
     source_id: str = Field(..., description="Source entity ID")
     target_id: str = Field(..., description="Target entity ID")
     updated_data: Dict[str, Any] = Field(..., description="Updated data for the relation")

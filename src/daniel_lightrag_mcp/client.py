@@ -444,9 +444,19 @@ class LightRAGClient:
         response_data = await self._make_request("POST", "/graph/entity/edit", request_data.model_dump())
         return EntityUpdateResponse(**response_data)
     
-    async def update_relation(self, relation_id: str, properties: Dict[str, Any], source_id: str = "unknown", target_id: str = "unknown") -> RelationUpdateResponse:
+    # async def update_relation(self, relation_id: str, properties: Dict[str, Any], source_id: str = "unknown", target_id: str = "unknown") -> RelationUpdateResponse:
+    #     """Update a relation in the knowledge graph."""
+    #     request_data = RelationUpdateRequest(relation_id=relation_id, source_id=source_id, target_id=target_id, updated_data=properties)
+    #     response_data = await self._make_request("POST", "/graph/relation/edit", request_data.model_dump())
+    #     return RelationUpdateResponse(**response_data)
+
+    async def update_relation(self, source_id: str, target_id: str, updated_data: Dict[str, Any]) -> RelationUpdateResponse:
         """Update a relation in the knowledge graph."""
-        request_data = RelationUpdateRequest(relation_id=relation_id, source_id=source_id, target_id=target_id, updated_data=properties)
+        request_data = RelationUpdateRequest(
+            source_id=source_id,
+            target_id=target_id,
+            updated_data=updated_data
+        )
         response_data = await self._make_request("POST", "/graph/relation/edit", request_data.model_dump())
         return RelationUpdateResponse(**response_data)
     

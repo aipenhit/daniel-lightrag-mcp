@@ -67,7 +67,7 @@ def _validate_tool_arguments(tool_name: str, arguments: Dict[str, Any]) -> None:
         "query_text_stream": ["query"],
         "check_entity_exists": ["entity_name"],
         "update_entity": ["entity_id", "properties"],
-        "update_relation": ["relation_id", "properties"],
+        "update_relation": ["source_id", "target_id", "updated_data"],
         "delete_entity": ["entity_id"],
         "delete_relation": ["relation_id"],
         "get_track_status": ["track_id"],
@@ -185,55 +185,6 @@ def _create_success_response(result: Any, tool_name: str) -> dict:
     
     return response_dict
 
-# def _create_success_response(result: Any, tool_name: str) -> CallToolResult:
-#     """Create standardized MCP success response."""
-#     logger.info(f"Successfully executed {tool_name}")
-#     return CallToolResult(
-#         content=[TextContent(type="text", text=_serialize_result(result))]
-#     )
-# def _create_success_response(result: Any, tool_name: str) -> CallToolResult:
-#     """Create standardized MCP success response."""
-#     logger.info(f"Successfully executed {tool_name}")
-    
-#     # Simple text response format
-#     # response_text = json.dumps(result, indent=2) if result else "Success"
-
-#     # Handle Pydantic models properly
-#     if hasattr(result, 'model_dump'):
-#         # Pydantic v2
-#         response_text = json.dumps(result.model_dump(), indent=2)
-#     elif hasattr(result, 'dict'):
-#         # Pydantic v1
-#         response_text = json.dumps(result.dict(), indent=2)
-#     elif result:
-#         response_text = json.dumps(result, indent=2)
-#     else:
-#         response_text = "Success"
-
-    
-#     return CallToolResult(
-#         content=[TextContent(type="text", text=response_text)]
-#     )
-# def _create_success_response(result: Any, tool_name: str) -> CallToolResult:
-#     """Create standardized MCP success response."""
-#     logger.info(f"Successfully executed {tool_name}")
-    
-#     # Handle Pydantic models properly
-#     if hasattr(result, 'model_dump'):
-#         response_text = json.dumps(result.model_dump(), indent=2)
-#     elif hasattr(result, 'dict'):
-#         response_text = json.dumps(result.dict(), indent=2)
-#     elif result:
-#         response_text = json.dumps(result, indent=2)
-#     else:
-#         response_text = "Success"
-    
-#     # Create TextContent object explicitly
-#     text_content = TextContent(type="text", text=response_text)
-    
-#     # Return CallToolResult with explicit parameters
-#     return CallToolResult(content=[text_content])
-
 
 def _create_error_response(error: Exception, tool_name: str) -> dict:
     """Create standardized MCP error response."""
@@ -336,10 +287,20 @@ def _create_error_response(error: Exception, tool_name: str) -> dict:
 @server.list_tools()
 async def handle_list_tools() -> List[Tool]:#ListToolsResult:
     """List available tools."""
-    logger.info("Listing available MCP tools")
+    logger.info("=" * 80)
+    logger.info("LISTING AVAILABLE MCP TOOLS")
+    logger.info("=" * 80)
+    logger.info("LIST_TOOLS HANDLER STARTED:")
+    logger.info(f"  - Function: handle_list_tools")
+    logger.info(f"  - Server: {server}")
+    logger.info(f"  - Server type: {type(server)}")
     
     # Create tools list with explicit validation
     tools = []
+    logger.info("TOOLS LIST INITIALIZATION:")
+    logger.info(f"  - Initial tools list: {tools}")
+    logger.info(f"  - Tools list type: {type(tools)}")
+    logger.info("  - Starting tool creation process...")
     
     # Document Management Tools (8 tools)
     tools.extend([
@@ -414,7 +375,7 @@ async def handle_list_tools() -> List[Tool]:#ListToolsResult:
         ),
         Tool(
             name="get_documents_paginated",
-            description="Retrieve documents with pagination",
+            description="Retrieve documents with pagination. IMPORTANT: page_size must be 10-100 (server enforces minimum for performance). Use page_size=20 for typical browsing.",
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -447,15 +408,15 @@ async def handle_list_tools() -> List[Tool]:#ListToolsResult:
                 "required": ["document_id"]
             }
         ),
-        Tool(
-            name="clear_documents",
-            description="Clear all documents from LightRAG",
-            inputSchema={
-                "type": "object",
-                "properties": {},
-                "required": []
-            }
-        ),
+        # Tool(
+        #     name="clear_documents",
+        #     description="Clear all documents from LightRAG",
+        #     inputSchema={
+        #         "type": "object",
+        #         "properties": {},
+        #         "required": []
+        #     }
+        # ),
     ])
     
     # Query Tools (2 tools)
@@ -564,22 +525,44 @@ async def handle_list_tools() -> List[Tool]:#ListToolsResult:
                 "required": ["entity_id", "properties"]
             }
         ),
+        # Tool(
+        #     name="update_relation",
+        #     description="Update a relation in the knowledge graph",
+        #     inputSchema={
+        #         "type": "object",
+        #         "properties": {
+        #             "relation_id": {
+        #                 "type": "string",
+        #                 "description": "ID of the relation to update"
+        #             },
+        #             "properties": {
+        #                 "type": "object",
+        #                 "description": "Properties to update"
+        #             }
+        #         },
+        #         "required": ["relation_id", "properties"]
+        #     }
+        # ),
         Tool(
             name="update_relation",
             description="Update a relation in the knowledge graph",
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "relation_id": {
+                    "source_id": {
                         "type": "string",
-                        "description": "ID of the relation to update"
+                        "description": "ID of the source entity"
                     },
-                    "properties": {
+                    "target_id": {
+                        "type": "string",
+                        "description": "ID of the target entity"
+                    },
+                    "updated_data": {
                         "type": "object",
-                        "description": "Properties to update"
+                        "description": "Properties to update on the relation"
                     }
                 },
-                "required": ["relation_id", "properties"]
+                "required": ["source_id", "target_id", "updated_data"]
             }
         ),
         Tool(
@@ -646,15 +629,15 @@ async def handle_list_tools() -> List[Tool]:#ListToolsResult:
                 "required": []
             }
         ),
-        Tool(
-            name="clear_cache",
-            description="Clear LightRAG cache",
-            inputSchema={
-                "type": "object",
-                "properties": {},
-                "required": []
-            }
-        ),
+        # Tool(
+        #     name="clear_cache",
+        #     description="Clear LightRAG cache",
+        #     inputSchema={
+        #         "type": "object",
+        #         "properties": {},
+        #         "required": []
+        #     }
+        # ),
         Tool(
             name="get_health",
             description="Check LightRAG server health",
@@ -666,17 +649,139 @@ async def handle_list_tools() -> List[Tool]:#ListToolsResult:
         ),
     ])
     
-    logger.info(f"Created {len(tools)} tools")
+    logger.info("TOOLS CREATION COMPLETED:")
+    logger.info(f"  - Total tools created: {len(tools)}")
+    logger.info(f"  - Tools list type: {type(tools)}")
+    logger.info(f"  - Tools list length: {len(tools)}")
     
-    # Simple validation like working server
+    # Log tool categories
+    doc_tools = [t for t in tools if any(keyword in t.name for keyword in ['insert', 'upload', 'scan', 'get_documents', 'delete_document', 'clear_documents'])]
+    query_tools = [t for t in tools if 'query' in t.name]
+    kg_tools = [t for t in tools if any(keyword in t.name for keyword in ['knowledge', 'graph', 'entity', 'relation', 'labels'])]
+    system_tools = [t for t in tools if any(keyword in t.name for keyword in ['pipeline', 'track', 'status', 'health', 'cache'])]
+    
+    logger.info("TOOLS BY CATEGORY:")
+    logger.info(f"  - Document Management Tools: {len(doc_tools)}")
+    for tool in doc_tools:
+        logger.info(f"    - {tool.name}")
+    logger.info(f"  - Query Tools: {len(query_tools)}")
+    for tool in query_tools:
+        logger.info(f"    - {tool.name}")
+    logger.info(f"  - Knowledge Graph Tools: {len(kg_tools)}")
+    for tool in kg_tools:
+        logger.info(f"    - {tool.name}")
+    logger.info(f"  - System Management Tools: {len(system_tools)}")
+    for tool in system_tools:
+        logger.info(f"    - {tool.name}")
+    
+    # Comprehensive validation
+    logger.info("TOOLS VALIDATION:")
+    validation_errors = []
     for i, tool in enumerate(tools):
+        logger.info(f"  - Validating tool {i}: {tool.name}")
+        
         if not isinstance(tool, Tool):
-            raise ValueError(f"Tool {i} is not a Tool instance: {type(tool)}")
-        logger.info(f"Tool {i}: {tool.name} - OK")
+            error_msg = f"Tool {i} is not a Tool instance: {type(tool)}"
+            logger.error(f"    - VALIDATION ERROR: {error_msg}")
+            validation_errors.append(error_msg)
+            continue
+        
+        # Validate tool properties
+        if not hasattr(tool, 'name') or not tool.name:
+            error_msg = f"Tool {i} has no name or empty name"
+            logger.error(f"    - VALIDATION ERROR: {error_msg}")
+            validation_errors.append(error_msg)
+            continue
+        
+        if not hasattr(tool, 'description') or not tool.description:
+            error_msg = f"Tool {i} ({tool.name}) has no description or empty description"
+            logger.error(f"    - VALIDATION ERROR: {error_msg}")
+            validation_errors.append(error_msg)
+            continue
+        
+        if not hasattr(tool, 'inputSchema') or not tool.inputSchema:
+            error_msg = f"Tool {i} ({tool.name}) has no inputSchema or empty inputSchema"
+            logger.error(f"    - VALIDATION ERROR: {error_msg}")
+            validation_errors.append(error_msg)
+            continue
+        
+        # Validate input schema structure
+        schema = tool.inputSchema
+        if not isinstance(schema, dict):
+            error_msg = f"Tool {i} ({tool.name}) inputSchema is not a dict: {type(schema)}"
+            logger.error(f"    - VALIDATION ERROR: {error_msg}")
+            validation_errors.append(error_msg)
+            continue
+        
+        if 'type' not in schema or schema['type'] != 'object':
+            error_msg = f"Tool {i} ({tool.name}) inputSchema missing 'type': 'object'"
+            logger.error(f"    - VALIDATION ERROR: {error_msg}")
+            validation_errors.append(error_msg)
+            continue
+        
+        if 'properties' not in schema:
+            error_msg = f"Tool {i} ({tool.name}) inputSchema missing 'properties'"
+            logger.error(f"    - VALIDATION ERROR: {error_msg}")
+            validation_errors.append(error_msg)
+            continue
+        
+        if 'required' not in schema:
+            error_msg = f"Tool {i} ({tool.name}) inputSchema missing 'required'"
+            logger.error(f"    - VALIDATION ERROR: {error_msg}")
+            validation_errors.append(error_msg)
+            continue
+        
+        logger.info(f"    - Tool {i} ({tool.name}): VALIDATION PASSED")
+        logger.info(f"      - Name: '{tool.name}'")
+        logger.info(f"      - Description length: {len(tool.description)}")
+        logger.info(f"      - Properties count: {len(schema.get('properties', {}))}")
+        logger.info(f"      - Required fields: {schema.get('required', [])}")
+    
+    # Check for validation errors
+    if validation_errors:
+        logger.error("TOOLS VALIDATION FAILED:")
+        for error in validation_errors:
+            logger.error(f"  - {error}")
+        raise ValueError(f"Tool validation failed with {len(validation_errors)} errors: {validation_errors}")
+    
+    logger.info("TOOLS VALIDATION COMPLETED:")
+    logger.info(f"  - All {len(tools)} tools passed validation")
     
     # Create result exactly like working server
-    result = ListToolsResult(tools=tools)
-    logger.info(f"ListToolsResult created successfully with {len(result.tools)} tools")
+    logger.info("CREATING LIST_TOOLS_RESULT:")
+    try:
+        result = ListToolsResult(tools=tools)
+        logger.info(f"  - ListToolsResult created successfully")
+        logger.info(f"  - Result type: {type(result)}")
+        logger.info(f"  - Result.tools type: {type(result.tools)}")
+        logger.info(f"  - Result.tools length: {len(result.tools)}")
+        
+        # Validate result
+        if not hasattr(result, 'tools'):
+            raise ValueError("ListToolsResult missing 'tools' attribute")
+        
+        if not isinstance(result.tools, list):
+            raise ValueError(f"ListToolsResult.tools is not a list: {type(result.tools)}")
+        
+        if len(result.tools) != len(tools):
+            raise ValueError(f"ListToolsResult.tools length mismatch: {len(result.tools)} != {len(tools)}")
+        
+        logger.info("  - ListToolsResult validation passed")
+        
+    except Exception as e:
+        logger.error("LIST_TOOLS_RESULT CREATION FAILED:")
+        logger.error(f"  - Exception type: {type(e)}")
+        logger.error(f"  - Exception message: {str(e)}")
+        logger.error(f"  - Exception args: {e.args}")
+        logger.error(f"  - Tools count: {len(tools)}")
+        import traceback
+        logger.error(f"  - Full traceback: {traceback.format_exc()}")
+        raise
+    
+    logger.info("LIST_TOOLS HANDLER COMPLETED:")
+    logger.info(f"  - Returning {len(tools)} tools")
+    logger.info(f"  - Return type: {type(tools)}")
+    logger.info("=" * 80)
     
     return tools
 
@@ -797,38 +902,390 @@ async def handle_call_tool(self, request: CallToolRequest) -> dict:
         
         # Document Management Tools (8 tools)
         if tool_name == "insert_text":
-            result = await lightrag_client.insert_text(arguments["text"])
-            return _create_success_response(result, tool_name)
+            logger.info("EXECUTING INSERT_TEXT TOOL:")
+            logger.info(f"  - Tool: {tool_name}")
+            logger.info(f"  - Client type: {type(lightrag_client)}")
+            logger.info(f"  - Client base_url: {lightrag_client.base_url}")
+            logger.info(f"  - Raw arguments: {arguments}")
+            
+            text = arguments.get("text", "")
+            logger.info(f"INSERT_TEXT PARAMETERS:")
+            logger.info(f"  - text: '{text[:100]}{'...' if len(text) > 100 else ''}' (length: {len(text)})")
+            logger.info(f"  - text type: {type(text)}")
+            
+            if not text or not text.strip():
+                logger.error("INSERT_TEXT VALIDATION ERROR:")
+                logger.error("  - Text is empty or whitespace only")
+                raise LightRAGValidationError("Text cannot be empty")
+            
+            logger.info("  - Parameter validation passed")
+            logger.info("  - Calling lightrag_client.insert_text()...")
+            
+            try:
+                result = await lightrag_client.insert_text(text)
+                logger.info("INSERT_TEXT SUCCESS:")
+                logger.info(f"  - Result type: {type(result)}")
+                logger.info(f"  - Result content: {repr(result)}")
+                if hasattr(result, 'model_dump'):
+                    try:
+                        result_dump = result.model_dump()
+                        logger.info(f"  - Result.model_dump(): {result_dump}")
+                        logger.info(f"  - Status: {result_dump.get('status', 'N/A')}")
+                        logger.info(f"  - Track ID: {result_dump.get('track_id', 'N/A')}")
+                        logger.info(f"  - Message: {result_dump.get('message', 'N/A')}")
+                    except Exception as e:
+                        logger.error(f"  - model_dump() failed: {e}")
+                
+                response = _create_success_response(result, tool_name)
+                logger.info(f"  - Success response created")
+                return response
+            except Exception as e:
+                logger.error("INSERT_TEXT FAILED:")
+                logger.error(f"  - Exception type: {type(e)}")
+                logger.error(f"  - Exception message: {str(e)}")
+                logger.error(f"  - Text length: {len(text)}")
+                import traceback
+                logger.error(f"  - Full traceback: {traceback.format_exc()}")
+                raise
         
         elif tool_name == "insert_texts":
-            result = await lightrag_client.insert_texts(arguments["texts"])
-            return _create_success_response(result, tool_name)
+            logger.info("EXECUTING INSERT_TEXTS TOOL:")
+            logger.info(f"  - Tool: {tool_name}")
+            logger.info(f"  - Client type: {type(lightrag_client)}")
+            logger.info(f"  - Client base_url: {lightrag_client.base_url}")
+            logger.info(f"  - Raw arguments: {arguments}")
+            
+            texts = arguments.get("texts", [])
+            logger.info(f"INSERT_TEXTS PARAMETERS:")
+            logger.info(f"  - texts count: {len(texts)}")
+            logger.info(f"  - texts type: {type(texts)}")
+            
+            if not texts or not isinstance(texts, list):
+                logger.error("INSERT_TEXTS VALIDATION ERROR:")
+                logger.error("  - Texts is empty or not a list")
+                raise LightRAGValidationError("Texts must be a non-empty list")
+            
+            for i, text_doc in enumerate(texts):
+                logger.info(f"  - Text {i}: {text_doc}")
+                if not isinstance(text_doc, dict) or 'content' not in text_doc:
+                    logger.error(f"INSERT_TEXTS VALIDATION ERROR:")
+                    logger.error(f"  - Text {i} missing required 'content' field")
+                    raise LightRAGValidationError(f"Text {i} must have 'content' field")
+            
+            logger.info("  - Parameter validation passed")
+            logger.info("  - Calling lightrag_client.insert_texts()...")
+            
+            try:
+                result = await lightrag_client.insert_texts(texts)
+                logger.info("INSERT_TEXTS SUCCESS:")
+                logger.info(f"  - Result type: {type(result)}")
+                logger.info(f"  - Result content: {repr(result)}")
+                if hasattr(result, 'model_dump'):
+                    try:
+                        result_dump = result.model_dump()
+                        logger.info(f"  - Result.model_dump(): {result_dump}")
+                        logger.info(f"  - Status: {result_dump.get('status', 'N/A')}")
+                        logger.info(f"  - Track ID: {result_dump.get('track_id', 'N/A')}")
+                        logger.info(f"  - Message: {result_dump.get('message', 'N/A')}")
+                    except Exception as e:
+                        logger.error(f"  - model_dump() failed: {e}")
+                
+                response = _create_success_response(result, tool_name)
+                logger.info(f"  - Success response created")
+                return response
+            except Exception as e:
+                logger.error("INSERT_TEXTS FAILED:")
+                logger.error(f"  - Exception type: {type(e)}")
+                logger.error(f"  - Exception message: {str(e)}")
+                logger.error(f"  - Texts count: {len(texts)}")
+                import traceback
+                logger.error(f"  - Full traceback: {traceback.format_exc()}")
+                raise
         
         elif tool_name == "upload_document":
-            result = await lightrag_client.upload_document(arguments["file_path"])
-            return _create_success_response(result, tool_name)
+            logger.info("EXECUTING UPLOAD_DOCUMENT TOOL:")
+            logger.info(f"  - Tool: {tool_name}")
+            logger.info(f"  - Client type: {type(lightrag_client)}")
+            logger.info(f"  - Client base_url: {lightrag_client.base_url}")
+            logger.info(f"  - Raw arguments: {arguments}")
+            
+            file_path = arguments.get("file_path", "")
+            logger.info(f"UPLOAD_DOCUMENT PARAMETERS:")
+            logger.info(f"  - file_path: '{file_path}'")
+            logger.info(f"  - file_path type: {type(file_path)}")
+            
+            if not file_path or not file_path.strip():
+                logger.error("UPLOAD_DOCUMENT VALIDATION ERROR:")
+                logger.error("  - File path is empty or whitespace only")
+                raise LightRAGValidationError("File path cannot be empty")
+            
+            # Check if file exists
+            if not os.path.exists(file_path):
+                logger.error("UPLOAD_DOCUMENT FILE ERROR:")
+                logger.error(f"  - File does not exist: {file_path}")
+                raise LightRAGValidationError(f"File does not exist: {file_path}")
+            
+            # Get file info
+            file_size = os.path.getsize(file_path)
+            logger.info(f"FILE INFORMATION:")
+            logger.info(f"  - File exists: True")
+            logger.info(f"  - File size: {file_size} bytes")
+            logger.info(f"  - File readable: {os.access(file_path, os.R_OK)}")
+            
+            logger.info("  - Parameter validation passed")
+            logger.info("  - Calling lightrag_client.upload_document()...")
+            
+            try:
+                result = await lightrag_client.upload_document(file_path)
+                logger.info("UPLOAD_DOCUMENT SUCCESS:")
+                logger.info(f"  - Result type: {type(result)}")
+                logger.info(f"  - Result content: {repr(result)}")
+                if hasattr(result, 'model_dump'):
+                    try:
+                        result_dump = result.model_dump()
+                        logger.info(f"  - Result.model_dump(): {result_dump}")
+                        logger.info(f"  - Status: {result_dump.get('status', 'N/A')}")
+                        logger.info(f"  - Track ID: {result_dump.get('track_id', 'N/A')}")
+                        logger.info(f"  - Message: {result_dump.get('message', 'N/A')}")
+                    except Exception as e:
+                        logger.error(f"  - model_dump() failed: {e}")
+                
+                response = _create_success_response(result, tool_name)
+                logger.info(f"  - Success response created")
+                return response
+            except Exception as e:
+                logger.error("UPLOAD_DOCUMENT FAILED:")
+                logger.error(f"  - Exception type: {type(e)}")
+                logger.error(f"  - Exception message: {str(e)}")
+                logger.error(f"  - File path: {file_path}")
+                logger.error(f"  - File size: {file_size}")
+                import traceback
+                logger.error(f"  - Full traceback: {traceback.format_exc()}")
+                raise
         
         elif tool_name == "scan_documents":
-            result = await lightrag_client.scan_documents()
-            return _create_success_response(result, tool_name)
+            logger.info("EXECUTING SCAN_DOCUMENTS TOOL:")
+            logger.info(f"  - Tool: {tool_name}")
+            logger.info(f"  - Client type: {type(lightrag_client)}")
+            logger.info(f"  - Client base_url: {lightrag_client.base_url}")
+            logger.info(f"  - Arguments: {arguments}")
+            logger.info("  - This tool requires no parameters")
+            logger.info("  - Calling lightrag_client.scan_documents()...")
+            
+            try:
+                result = await lightrag_client.scan_documents()
+                logger.info("SCAN_DOCUMENTS SUCCESS:")
+                logger.info(f"  - Result type: {type(result)}")
+                logger.info(f"  - Result content: {repr(result)}")
+                if hasattr(result, 'model_dump'):
+                    try:
+                        result_dump = result.model_dump()
+                        logger.info(f"  - Result.model_dump(): {result_dump}")
+                        logger.info(f"  - Status: {result_dump.get('status', 'N/A')}")
+                        logger.info(f"  - Track ID: {result_dump.get('track_id', 'N/A')}")
+                        logger.info(f"  - Message: {result_dump.get('message', 'N/A')}")
+                        new_docs = result_dump.get('new_documents', [])
+                        logger.info(f"  - New documents found: {len(new_docs)}")
+                    except Exception as e:
+                        logger.error(f"  - model_dump() failed: {e}")
+                
+                response = _create_success_response(result, tool_name)
+                logger.info(f"  - Success response created")
+                return response
+            except Exception as e:
+                logger.error("SCAN_DOCUMENTS FAILED:")
+                logger.error(f"  - Exception type: {type(e)}")
+                logger.error(f"  - Exception message: {str(e)}")
+                import traceback
+                logger.error(f"  - Full traceback: {traceback.format_exc()}")
+                raise
         
         elif tool_name == "get_documents":
-            result = await lightrag_client.get_documents()
-            return _create_success_response(result, tool_name)
+            logger.info("EXECUTING GET_DOCUMENTS TOOL:")
+            logger.info(f"  - Tool: {tool_name}")
+            logger.info(f"  - Client type: {type(lightrag_client)}")
+            logger.info(f"  - Client base_url: {lightrag_client.base_url}")
+            logger.info(f"  - Arguments: {arguments}")
+            logger.info("  - This tool requires no parameters")
+            logger.info("  - Calling lightrag_client.get_documents()...")
+            
+            try:
+                result = await lightrag_client.get_documents()
+                logger.info("GET_DOCUMENTS SUCCESS:")
+                logger.info(f"  - Result type: {type(result)}")
+                logger.info(f"  - Result content: {repr(result)}")
+                if hasattr(result, 'model_dump'):
+                    try:
+                        result_dump = result.model_dump()
+                        logger.info(f"  - Result.model_dump(): {result_dump}")
+                        statuses = result_dump.get('statuses', {})
+                        logger.info(f"DOCUMENT STATUSES:")
+                        for status, docs in statuses.items():
+                            logger.info(f"    - {status}: {len(docs) if docs else 0} documents")
+                            if docs and len(docs) > 0:
+                                logger.info(f"    - First {status} doc ID: {docs[0].get('id', 'N/A')}")
+                    except Exception as e:
+                        logger.error(f"  - model_dump() failed: {e}")
+                
+                response = _create_success_response(result, tool_name)
+                logger.info(f"  - Success response created")
+                return response
+            except Exception as e:
+                logger.error("GET_DOCUMENTS FAILED:")
+                logger.error(f"  - Exception type: {type(e)}")
+                logger.error(f"  - Exception message: {str(e)}")
+                import traceback
+                logger.error(f"  - Full traceback: {traceback.format_exc()}")
+                raise
         
         elif tool_name == "get_documents_paginated":
-            result = await lightrag_client.get_documents_paginated(
-                arguments["page"], arguments["page_size"]
-            )
-            return _create_success_response(result, tool_name)
+            logger.info("EXECUTING GET_DOCUMENTS_PAGINATED TOOL:")
+            logger.info(f"  - Tool: {tool_name}")
+            logger.info(f"  - Client type: {type(lightrag_client)}")
+            logger.info(f"  - Client base_url: {lightrag_client.base_url}")
+            logger.info(f"  - Raw arguments: {arguments}")
+            
+            page = arguments.get("page", 1)
+            page_size = arguments.get("page_size", 10)
+            logger.info(f"GET_DOCUMENTS_PAGINATED PARAMETERS:")
+            logger.info(f"  - page: {page} (type: {type(page)})")
+            logger.info(f"  - page_size: {page_size} (type: {type(page_size)})")
+            
+            if not isinstance(page, int) or page < 1:
+                logger.error("GET_DOCUMENTS_PAGINATED VALIDATION ERROR:")
+                logger.error(f"  - Invalid page: {page}")
+                raise LightRAGValidationError("Page must be a positive integer")
+            
+            if not isinstance(page_size, int) or page_size < 1 or page_size > 100:
+                logger.error("GET_DOCUMENTS_PAGINATED VALIDATION ERROR:")
+                logger.error(f"  - Invalid page_size: {page_size}")
+                raise LightRAGValidationError("Page size must be an integer between 1 and 100")
+            
+            logger.info("  - Parameter validation passed")
+            logger.info("  - Calling lightrag_client.get_documents_paginated()...")
+            
+            try:
+                result = await lightrag_client.get_documents_paginated(page, page_size)
+                logger.info("GET_DOCUMENTS_PAGINATED SUCCESS:")
+                logger.info(f"  - Result type: {type(result)}")
+                logger.info(f"  - Result content: {repr(result)}")
+                if hasattr(result, 'model_dump'):
+                    try:
+                        result_dump = result.model_dump()
+                        logger.info(f"  - Result.model_dump(): {result_dump}")
+                        documents = result_dump.get('documents', [])
+                        pagination = result_dump.get('pagination', {})
+                        status_counts = result_dump.get('status_counts', {})
+                        logger.info(f"PAGINATION DETAILS:")
+                        logger.info(f"    - Documents returned: {len(documents)}")
+                        logger.info(f"    - Current page: {pagination.get('page', 'N/A')}")
+                        logger.info(f"    - Page size: {pagination.get('page_size', 'N/A')}")
+                        logger.info(f"    - Total count: {pagination.get('total_count', 'N/A')}")
+                        logger.info(f"    - Total pages: {pagination.get('total_pages', 'N/A')}")
+                        logger.info(f"    - Has next: {pagination.get('has_next', 'N/A')}")
+                        logger.info(f"    - Has prev: {pagination.get('has_prev', 'N/A')}")
+                        logger.info(f"STATUS COUNTS:")
+                        for status, count in status_counts.items():
+                            logger.info(f"    - {status}: {count}")
+                    except Exception as e:
+                        logger.error(f"  - model_dump() failed: {e}")
+                
+                response = _create_success_response(result, tool_name)
+                logger.info(f"  - Success response created")
+                return response
+            except Exception as e:
+                logger.error("GET_DOCUMENTS_PAGINATED FAILED:")
+                logger.error(f"  - Exception type: {type(e)}")
+                logger.error(f"  - Exception message: {str(e)}")
+                logger.error(f"  - Page: {page}")
+                logger.error(f"  - Page size: {page_size}")
+                import traceback
+                logger.error(f"  - Full traceback: {traceback.format_exc()}")
+                raise
         
         elif tool_name == "delete_document":
-            result = await lightrag_client.delete_document(arguments["document_id"])
-            return _create_success_response(result, tool_name)
+            logger.info("EXECUTING DELETE_DOCUMENT TOOL:")
+            logger.info(f"  - Tool: {tool_name}")
+            logger.info(f"  - Client type: {type(lightrag_client)}")
+            logger.info(f"  - Client base_url: {lightrag_client.base_url}")
+            logger.info(f"  - Raw arguments: {arguments}")
+            
+            document_id = arguments.get("document_id", "")
+            logger.info(f"DELETE_DOCUMENT PARAMETERS:")
+            logger.info(f"  - document_id: '{document_id}'")
+            logger.info(f"  - document_id type: {type(document_id)}")
+            
+            if not document_id or not document_id.strip():
+                logger.error("DELETE_DOCUMENT VALIDATION ERROR:")
+                logger.error("  - Document ID is empty or whitespace only")
+                raise LightRAGValidationError("Document ID cannot be empty")
+            
+            logger.info("  - Parameter validation passed")
+            logger.info("  - Calling lightrag_client.delete_document()...")
+            logger.warning(f"  - DESTRUCTIVE OPERATION: Deleting document {document_id}")
+            
+            try:
+                result = await lightrag_client.delete_document(document_id)
+                logger.info("DELETE_DOCUMENT SUCCESS:")
+                logger.info(f"  - Result type: {type(result)}")
+                logger.info(f"  - Result content: {repr(result)}")
+                if hasattr(result, 'model_dump'):
+                    try:
+                        result_dump = result.model_dump()
+                        logger.info(f"  - Result.model_dump(): {result_dump}")
+                        logger.info(f"  - Status: {result_dump.get('status', 'N/A')}")
+                        logger.info(f"  - Message: {result_dump.get('message', 'N/A')}")
+                    except Exception as e:
+                        logger.error(f"  - model_dump() failed: {e}")
+                
+                response = _create_success_response(result, tool_name)
+                logger.info(f"  - Success response created")
+                logger.warning(f"  - Document {document_id} has been deleted")
+                return response
+            except Exception as e:
+                logger.error("DELETE_DOCUMENT FAILED:")
+                logger.error(f"  - Exception type: {type(e)}")
+                logger.error(f"  - Exception message: {str(e)}")
+                logger.error(f"  - Document ID: {document_id}")
+                import traceback
+                logger.error(f"  - Full traceback: {traceback.format_exc()}")
+                raise
         
         elif tool_name == "clear_documents":
-            result = await lightrag_client.clear_documents()
-            return _create_success_response(result, tool_name)
+            logger.info("EXECUTING CLEAR_DOCUMENTS TOOL:")
+            logger.info(f"  - Tool: {tool_name}")
+            logger.info(f"  - Client type: {type(lightrag_client)}")
+            logger.info(f"  - Client base_url: {lightrag_client.base_url}")
+            logger.info(f"  - Arguments: {arguments}")
+            logger.info("  - This tool requires no parameters")
+            logger.info("  - Calling lightrag_client.clear_documents()...")
+            logger.warning("  - DESTRUCTIVE OPERATION: Clearing ALL documents")
+            
+            try:
+                result = await lightrag_client.clear_documents()
+                logger.info("CLEAR_DOCUMENTS SUCCESS:")
+                logger.info(f"  - Result type: {type(result)}")
+                logger.info(f"  - Result content: {repr(result)}")
+                if hasattr(result, 'model_dump'):
+                    try:
+                        result_dump = result.model_dump()
+                        logger.info(f"  - Result.model_dump(): {result_dump}")
+                        logger.info(f"  - Status: {result_dump.get('status', 'N/A')}")
+                        logger.info(f"  - Message: {result_dump.get('message', 'N/A')}")
+                    except Exception as e:
+                        logger.error(f"  - model_dump() failed: {e}")
+                
+                response = _create_success_response(result, tool_name)
+                logger.info(f"  - Success response created")
+                logger.warning("  - ALL documents have been cleared")
+                return response
+            except Exception as e:
+                logger.error("CLEAR_DOCUMENTS FAILED:")
+                logger.error(f"  - Exception type: {type(e)}")
+                logger.error(f"  - Exception message: {str(e)}")
+                import traceback
+                logger.error(f"  - Full traceback: {traceback.format_exc()}")
+                raise
         
         # Query Tools (2 tools)
         elif tool_name == "query_text":
@@ -901,54 +1358,505 @@ async def handle_call_tool(self, request: CallToolRequest) -> dict:
                 raise
         
         elif tool_name == "query_text_stream":
+            logger.info("EXECUTING QUERY_TEXT_STREAM TOOL:")
+            logger.info(f"  - Tool: {tool_name}")
+            logger.info(f"  - Client type: {type(lightrag_client)}")
+            logger.info(f"  - Client base_url: {lightrag_client.base_url}")
+            logger.info(f"  - Raw arguments: {arguments}")
+            
+            # Extract and validate parameters
+            query = arguments.get("query", "")
             mode = arguments.get("mode", "hybrid")
             only_need_context = arguments.get("only_need_context", False)
             
-            # Collect streaming results
-            chunks = []
-            async for chunk in lightrag_client.query_text_stream(
-                arguments["query"], mode=mode, only_need_context=only_need_context
-            ):
-                chunks.append(chunk)
+            logger.info(f"QUERY_TEXT_STREAM PARAMETERS:")
+            logger.info(f"  - query: '{query}' (length: {len(query)})")
+            logger.info(f"  - mode: '{mode}'")
+            logger.info(f"  - only_need_context: {only_need_context}")
+            logger.info(f"  - query type: {type(query)}")
             
-            result = {"streaming_response": "".join(chunks)}
-            logger.info(f"Successfully executed {tool_name}, collected {len(chunks)} chunks")
-            return CallToolResult(
-                content=[TextContent(type="text", text=json.dumps(result, indent=2))]
-            )
+            # Validate query
+            if not query or not query.strip():
+                logger.error("QUERY_TEXT_STREAM VALIDATION ERROR:")
+                logger.error("  - Query is empty or whitespace only")
+                raise LightRAGValidationError("Query cannot be empty")
+            
+            valid_modes = ["naive", "local", "global", "hybrid"]
+            if mode not in valid_modes:
+                logger.error("QUERY_TEXT_STREAM MODE ERROR:")
+                logger.error(f"  - Invalid mode: '{mode}'")
+                logger.error(f"  - Valid modes: {valid_modes}")
+                raise LightRAGValidationError(f"Invalid query mode '{mode}'. Must be one of: {valid_modes}")
+            
+            logger.info("  - Parameter validation passed")
+            logger.info("  - Starting streaming query...")
+            
+            try:
+                # Collect streaming results
+                chunks = []
+                chunk_count = 0
+                total_length = 0
+                
+                logger.info("STREAMING COLLECTION:")
+                async for chunk in lightrag_client.query_text_stream(
+                    query, mode=mode, only_need_context=only_need_context
+                ):
+                    chunks.append(chunk)
+                    chunk_count += 1
+                    chunk_length = len(str(chunk))
+                    total_length += chunk_length
+                    
+                    # Log every 50th chunk to avoid spam
+                    if chunk_count % 50 == 0:
+                        logger.info(f"  - Collected {chunk_count} chunks, total length: {total_length}")
+                
+                logger.info("QUERY_TEXT_STREAM SUCCESS:")
+                logger.info(f"  - Total chunks collected: {chunk_count}")
+                logger.info(f"  - Total response length: {total_length}")
+                logger.info(f"  - Average chunk size: {total_length / chunk_count if chunk_count > 0 else 0:.2f}")
+                
+                # Join chunks into final response
+                streaming_response = "".join(chunks)
+                result = {"streaming_response": streaming_response}
+                
+                logger.info(f"STREAMING RESULT:")
+                logger.info(f"  - Final response length: {len(streaming_response)}")
+                logger.info(f"  - Response preview: {streaming_response[:200]}{'...' if len(streaming_response) > 200 else ''}")
+                
+                # Create MCP response
+                response = CallToolResult(
+                    content=[TextContent(type="text", text=json.dumps(result, indent=2))]
+                )
+                logger.info(f"  - MCP response created successfully")
+                return response
+                
+            except Exception as e:
+                logger.error("QUERY_TEXT_STREAM FAILED:")
+                logger.error(f"  - Exception type: {type(e)}")
+                logger.error(f"  - Exception message: {str(e)}")
+                logger.error(f"  - Exception args: {e.args}")
+                logger.error(f"  - Query: '{query}'")
+                logger.error(f"  - Mode: '{mode}'")
+                logger.error(f"  - Only need context: {only_need_context}")
+                logger.error(f"  - Chunks collected before error: {chunk_count}")
+                import traceback
+                logger.error(f"  - Full traceback: {traceback.format_exc()}")
+                raise
         
         # Knowledge Graph Tools (7 tools)
         elif tool_name == "get_knowledge_graph":
-            result = await lightrag_client.get_knowledge_graph()
-            return _create_success_response(result, tool_name)
+            logger.info("EXECUTING GET_KNOWLEDGE_GRAPH TOOL:")
+            logger.info(f"  - Tool: {tool_name}")
+            logger.info(f"  - Client type: {type(lightrag_client)}")
+            logger.info(f"  - Client base_url: {lightrag_client.base_url}")
+            logger.info(f"  - Arguments: {arguments}")
+            logger.info("  - This tool requires no parameters")
+            logger.info("  - Calling lightrag_client.get_knowledge_graph()...")
+            
+            try:
+                result = await lightrag_client.get_knowledge_graph()
+                logger.info("GET_KNOWLEDGE_GRAPH SUCCESS:")
+                logger.info(f"  - Result type: {type(result)}")
+                logger.info(f"  - Result content: {repr(result)}")
+                if hasattr(result, 'model_dump'):
+                    try:
+                        result_dump = result.model_dump()
+                        logger.info(f"  - Result.model_dump(): {result_dump}")
+                        nodes = result_dump.get('nodes', [])
+                        edges = result_dump.get('edges', [])
+                        logger.info(f"KNOWLEDGE GRAPH STATISTICS:")
+                        logger.info(f"    - Total nodes (entities): {len(nodes)}")
+                        logger.info(f"    - Total edges (relationships): {len(edges)}")
+                        logger.info(f"    - Is truncated: {result_dump.get('is_truncated', 'N/A')}")
+                        
+                        # Log entity types
+                        if nodes:
+                            entity_types = {}
+                            for node in nodes[:10]:  # Sample first 10
+                                entity_type = node.get('properties', {}).get('entity_type', 'unknown')
+                                entity_types[entity_type] = entity_types.get(entity_type, 0) + 1
+                            logger.info(f"    - Sample entity types: {entity_types}")
+                            logger.info(f"    - First entity: {nodes[0].get('id', 'N/A')}")
+                        
+                        # Log relationship types
+                        if edges:
+                            rel_types = {}
+                            for edge in edges[:10]:  # Sample first 10
+                                rel_type = edge.get('type', 'unknown')
+                                rel_types[rel_type] = rel_types.get(rel_type, 0) + 1
+                            logger.info(f"    - Sample relationship types: {rel_types}")
+                            logger.info(f"    - First relationship: {edges[0].get('id', 'N/A')}")
+                    except Exception as e:
+                        logger.error(f"  - model_dump() failed: {e}")
+                
+                response = _create_success_response(result, tool_name)
+                logger.info(f"  - Success response created")
+                return response
+            except Exception as e:
+                logger.error("GET_KNOWLEDGE_GRAPH FAILED:")
+                logger.error(f"  - Exception type: {type(e)}")
+                logger.error(f"  - Exception message: {str(e)}")
+                import traceback
+                logger.error(f"  - Full traceback: {traceback.format_exc()}")
+                raise
         
         elif tool_name == "get_graph_labels":
-            result = await lightrag_client.get_graph_labels()
-            return _create_success_response(result, tool_name)
+            logger.info("EXECUTING GET_GRAPH_LABELS TOOL:")
+            logger.info(f"  - Tool: {tool_name}")
+            logger.info(f"  - Client type: {type(lightrag_client)}")
+            logger.info(f"  - Client base_url: {lightrag_client.base_url}")
+            logger.info(f"  - Arguments: {arguments}")
+            logger.info("  - This tool requires no parameters")
+            logger.info("  - Calling lightrag_client.get_graph_labels()...")
+            
+            try:
+                result = await lightrag_client.get_graph_labels()
+                logger.info("GET_GRAPH_LABELS SUCCESS:")
+                logger.info(f"  - Result type: {type(result)}")
+                logger.info(f"  - Result content: {repr(result)}")
+                if hasattr(result, 'model_dump'):
+                    try:
+                        result_dump = result.model_dump()
+                        logger.info(f"  - Result.model_dump(): {result_dump}")
+                        entity_labels = result_dump.get('entity_labels', [])
+                        relation_labels = result_dump.get('relation_labels', [])
+                        logger.info(f"GRAPH LABELS:")
+                        logger.info(f"    - Entity labels count: {len(entity_labels)}")
+                        logger.info(f"    - Relation labels count: {len(relation_labels)}")
+                        if entity_labels:
+                            logger.info(f"    - Entity labels: {entity_labels}")
+                        if relation_labels:
+                            logger.info(f"    - Relation labels: {relation_labels}")
+                    except Exception as e:
+                        logger.error(f"  - model_dump() failed: {e}")
+                
+                response = _create_success_response(result, tool_name)
+                logger.info(f"  - Success response created")
+                return response
+            except Exception as e:
+                logger.error("GET_GRAPH_LABELS FAILED:")
+                logger.error(f"  - Exception type: {type(e)}")
+                logger.error(f"  - Exception message: {str(e)}")
+                import traceback
+                logger.error(f"  - Full traceback: {traceback.format_exc()}")
+                raise
         
         elif tool_name == "check_entity_exists":
-            result = await lightrag_client.check_entity_exists(arguments["entity_name"])
-            return _create_success_response(result, tool_name)
+            logger.info("EXECUTING CHECK_ENTITY_EXISTS TOOL:")
+            logger.info(f"  - Tool: {tool_name}")
+            logger.info(f"  - Client type: {type(lightrag_client)}")
+            logger.info(f"  - Client base_url: {lightrag_client.base_url}")
+            logger.info(f"  - Raw arguments: {arguments}")
+            
+            entity_name = arguments.get("entity_name", "")
+            logger.info(f"CHECK_ENTITY_EXISTS PARAMETERS:")
+            logger.info(f"  - entity_name: '{entity_name}'")
+            logger.info(f"  - entity_name type: {type(entity_name)}")
+            
+            if not entity_name or not entity_name.strip():
+                logger.error("CHECK_ENTITY_EXISTS VALIDATION ERROR:")
+                logger.error("  - Entity name is empty or whitespace only")
+                raise LightRAGValidationError("Entity name cannot be empty")
+            
+            logger.info("  - Parameter validation passed")
+            logger.info("  - Calling lightrag_client.check_entity_exists()...")
+            
+            try:
+                result = await lightrag_client.check_entity_exists(entity_name)
+                logger.info("CHECK_ENTITY_EXISTS SUCCESS:")
+                logger.info(f"  - Result type: {type(result)}")
+                logger.info(f"  - Result content: {repr(result)}")
+                if hasattr(result, 'model_dump'):
+                    try:
+                        result_dump = result.model_dump()
+                        logger.info(f"  - Result.model_dump(): {result_dump}")
+                        exists = result_dump.get('exists', False)
+                        logger.info(f"ENTITY EXISTENCE CHECK:")
+                        logger.info(f"    - Entity '{entity_name}' exists: {exists}")
+                        logger.info(f"    - Entity ID: {result_dump.get('entity_id', 'N/A')}")
+                    except Exception as e:
+                        logger.error(f"  - model_dump() failed: {e}")
+                
+                response = _create_success_response(result, tool_name)
+                logger.info(f"  - Success response created")
+                return response
+            except Exception as e:
+                logger.error("CHECK_ENTITY_EXISTS FAILED:")
+                logger.error(f"  - Exception type: {type(e)}")
+                logger.error(f"  - Exception message: {str(e)}")
+                logger.error(f"  - Entity name: {entity_name}")
+                import traceback
+                logger.error(f"  - Full traceback: {traceback.format_exc()}")
+                raise
         
         elif tool_name == "update_entity":
-            result = await lightrag_client.update_entity(
-                arguments["entity_id"], arguments["properties"]
-            )
-            return _create_success_response(result, tool_name)
+            logger.info("EXECUTING UPDATE_ENTITY TOOL:")
+            logger.info(f"  - Tool: {tool_name}")
+            logger.info(f"  - Client type: {type(lightrag_client)}")
+            logger.info(f"  - Client base_url: {lightrag_client.base_url}")
+            logger.info(f"  - Raw arguments: {arguments}")
+            
+            entity_id = arguments.get("entity_id", "")
+            properties = arguments.get("properties", {})
+            logger.info(f"UPDATE_ENTITY PARAMETERS:")
+            logger.info(f"  - entity_id: '{entity_id}'")
+            logger.info(f"  - entity_id type: {type(entity_id)}")
+            logger.info(f"  - properties: {properties}")
+            logger.info(f"  - properties type: {type(properties)}")
+            logger.info(f"  - properties keys: {list(properties.keys()) if isinstance(properties, dict) else 'N/A'}")
+            
+            if not entity_id or not entity_id.strip():
+                logger.error("UPDATE_ENTITY VALIDATION ERROR:")
+                logger.error("  - Entity ID is empty or whitespace only")
+                raise LightRAGValidationError("Entity ID cannot be empty")
+            
+            if not isinstance(properties, dict):
+                logger.error("UPDATE_ENTITY VALIDATION ERROR:")
+                logger.error(f"  - Properties must be a dictionary, got {type(properties)}")
+                raise LightRAGValidationError("Properties must be a dictionary")
+            
+            if not properties:
+                logger.warning("UPDATE_ENTITY WARNING:")
+                logger.warning("  - Properties dictionary is empty, no updates will be made")
+            
+            logger.info("  - Parameter validation passed")
+            logger.info("  - Calling lightrag_client.update_entity()...")
+            
+            try:
+                result = await lightrag_client.update_entity(entity_id, properties)
+                logger.info("UPDATE_ENTITY SUCCESS:")
+                logger.info(f"  - Result type: {type(result)}")
+                logger.info(f"  - Result content: {repr(result)}")
+                if hasattr(result, 'model_dump'):
+                    try:
+                        result_dump = result.model_dump()
+                        logger.info(f"  - Result.model_dump(): {result_dump}")
+                        logger.info(f"ENTITY UPDATE DETAILS:")
+                        logger.info(f"    - Status: {result_dump.get('status', 'N/A')}")
+                        logger.info(f"    - Message: {result_dump.get('message', 'N/A')}")
+                        data = result_dump.get('data', {})
+                        if data:
+                            logger.info(f"    - Updated entity name: {data.get('entity_name', 'N/A')}")
+                            graph_data = data.get('graph_data', {})
+                            if graph_data:
+                                logger.info(f"    - Entity type: {graph_data.get('entity_type', 'N/A')}")
+                                logger.info(f"    - Updated properties: {list(graph_data.keys())}")
+                    except Exception as e:
+                        logger.error(f"  - model_dump() failed: {e}")
+                
+                response = _create_success_response(result, tool_name)
+                logger.info(f"  - Success response created")
+                return response
+            except Exception as e:
+                logger.error("UPDATE_ENTITY FAILED:")
+                logger.error(f"  - Exception type: {type(e)}")
+                logger.error(f"  - Exception message: {str(e)}")
+                logger.error(f"  - Entity ID: {entity_id}")
+                logger.error(f"  - Properties: {properties}")
+                import traceback
+                logger.error(f"  - Full traceback: {traceback.format_exc()}")
+                raise
         
+        # elif tool_name == "update_relation":
+        #     logger.info("EXECUTING UPDATE_RELATION TOOL:")
+        #     logger.info(f"  - Tool: {tool_name}")
+        #     logger.info(f"  - Client type: {type(lightrag_client)}")
+        #     logger.info(f"  - Client base_url: {lightrag_client.base_url}")
+        #     logger.info(f"  - Raw arguments: {arguments}")
+            
+        #     relation_id = arguments.get("relation_id", "")
+        #     properties = arguments.get("properties", {})
+        #     logger.info(f"UPDATE_RELATION PARAMETERS:")
+        #     logger.info(f"  - relation_id: '{relation_id}'")
+        #     logger.info(f"  - relation_id type: {type(relation_id)}")
+        #     logger.info(f"  - properties: {properties}")
+        #     logger.info(f"  - properties type: {type(properties)}")
+        #     logger.info(f"  - properties keys: {list(properties.keys()) if isinstance(properties, dict) else 'N/A'}")
+            
+        #     if not relation_id or not relation_id.strip():
+        #         logger.error("UPDATE_RELATION VALIDATION ERROR:")
+        #         logger.error("  - Relation ID is empty or whitespace only")
+        #         raise LightRAGValidationError("Relation ID cannot be empty")
+            
+        #     if not isinstance(properties, dict):
+        #         logger.error("UPDATE_RELATION VALIDATION ERROR:")
+        #         logger.error(f"  - Properties must be a dictionary, got {type(properties)}")
+        #         raise LightRAGValidationError("Properties must be a dictionary")
+            
+        #     if not properties:
+        #         logger.warning("UPDATE_RELATION WARNING:")
+        #         logger.warning("  - Properties dictionary is empty, no updates will be made")
+            
+        #     logger.info("  - Parameter validation passed")
+        #     logger.info("  - Calling lightrag_client.update_relation()...")
+            
+        #     try:
+        #         result = await lightrag_client.update_relation(relation_id, properties)
+        #         logger.info("UPDATE_RELATION SUCCESS:")
+        #         logger.info(f"  - Result type: {type(result)}")
+        #         logger.info(f"  - Result content: {repr(result)}")
+        #         if hasattr(result, 'model_dump'):
+        #             try:
+        #                 result_dump = result.model_dump()
+        #                 logger.info(f"  - Result.model_dump(): {result_dump}")
+        #                 logger.info(f"RELATION UPDATE DETAILS:")
+        #                 logger.info(f"    - Status: {result_dump.get('status', 'N/A')}")
+        #                 logger.info(f"    - Message: {result_dump.get('message', 'N/A')}")
+        #                 data = result_dump.get('data', {})
+        #                 if data:
+        #                     logger.info(f"    - Updated relation ID: {data.get('relation_id', 'N/A')}")
+        #                     logger.info(f"    - Source: {data.get('source', 'N/A')}")
+        #                     logger.info(f"    - Target: {data.get('target', 'N/A')}")
+        #             except Exception as e:
+        #                 logger.error(f"  - model_dump() failed: {e}")
+                
+        #         response = _create_success_response(result, tool_name)
+        #         logger.info(f"  - Success response created")
+        #         return response
+        #     except Exception as e:
+        #         logger.error("UPDATE_RELATION FAILED:")
+        #         logger.error(f"  - Exception type: {type(e)}")
+        #         logger.error(f"  - Exception message: {str(e)}")
+        #         logger.error(f"  - Relation ID: {relation_id}")
+        #         logger.error(f"  - Properties: {properties}")
+        #         import traceback
+        #         logger.error(f"  - Full traceback: {traceback.format_exc()}")
+        #         raise
+
         elif tool_name == "update_relation":
-            result = await lightrag_client.update_relation(
-                arguments["relation_id"], arguments["properties"]
-            )
-            return _create_success_response(result, tool_name)
-        
+            logger.info("EXECUTING UPDATE_RELATION TOOL:")
+            logger.info(f"  - Raw arguments: {arguments}")
+
+            source_id = arguments.get("source_id", "")
+            target_id = arguments.get("target_id", "")
+            updated_data = arguments.get("updated_data", {})
+
+            logger.info(f"UPDATE_RELATION PARAMETERS:")
+            logger.info(f"  - source_id: '{source_id}'")
+            logger.info(f"  - target_id: '{target_id}'")
+            logger.info(f"  - updated_data: {updated_data}")
+
+            if not source_id.strip():
+                logger.error("UPDATE_RELATION VALIDATION ERROR: source_id is empty")
+                raise LightRAGValidationError("source_id cannot be empty")
+
+            if not target_id.strip():
+                logger.error("UPDATE_RELATION VALIDATION ERROR: target_id is empty")
+                raise LightRAGValidationError("target_id cannot be empty")
+
+            if not isinstance(updated_data, dict):
+                logger.error("UPDATE_RELATION VALIDATION ERROR: updated_data must be a dict")
+                raise LightRAGValidationError("updated_data must be a dictionary")
+
+            logger.info("  - Parameter validation passed")
+            logger.info("  - Calling lightrag_client.update_relation()...")
+
+            try:
+                result = await lightrag_client.update_relation(source_id, target_id, updated_data)
+                logger.info("UPDATE_RELATION SUCCESS:")
+                logger.info(f"  - Result content: {repr(result)}")
+                response = _create_success_response(result, tool_name)
+                logger.info(f"  - Success response created")
+                return response
+            except Exception as e:
+                logger.error(f"UPDATE_RELATION FAILED: {e}")
+                raise
+
         elif tool_name == "delete_entity":
-            result = await lightrag_client.delete_entity(arguments["entity_id"])
-            return _create_success_response(result, tool_name)
+            logger.info("EXECUTING DELETE_ENTITY TOOL:")
+            logger.info(f"  - Tool: {tool_name}")
+            logger.info(f"  - Client type: {type(lightrag_client)}")
+            logger.info(f"  - Client base_url: {lightrag_client.base_url}")
+            logger.info(f"  - Raw arguments: {arguments}")
+            
+            entity_id = arguments.get("entity_id", "")
+            logger.info(f"DELETE_ENTITY PARAMETERS:")
+            logger.info(f"  - entity_id: '{entity_id}'")
+            logger.info(f"  - entity_id type: {type(entity_id)}")
+            
+            if not entity_id or not entity_id.strip():
+                logger.error("DELETE_ENTITY VALIDATION ERROR:")
+                logger.error("  - Entity ID is empty or whitespace only")
+                raise LightRAGValidationError("Entity ID cannot be empty")
+            
+            logger.info("  - Parameter validation passed")
+            logger.info("  - Calling lightrag_client.delete_entity()...")
+            logger.warning(f"  - DESTRUCTIVE OPERATION: Deleting entity {entity_id}")
+            
+            try:
+                result = await lightrag_client.delete_entity(entity_id)
+                logger.info("DELETE_ENTITY SUCCESS:")
+                logger.info(f"  - Result type: {type(result)}")
+                logger.info(f"  - Result content: {repr(result)}")
+                if hasattr(result, 'model_dump'):
+                    try:
+                        result_dump = result.model_dump()
+                        logger.info(f"  - Result.model_dump(): {result_dump}")
+                        logger.info(f"  - Status: {result_dump.get('status', 'N/A')}")
+                        logger.info(f"  - Message: {result_dump.get('message', 'N/A')}")
+                    except Exception as e:
+                        logger.error(f"  - model_dump() failed: {e}")
+                
+                response = _create_success_response(result, tool_name)
+                logger.info(f"  - Success response created")
+                logger.warning(f"  - Entity {entity_id} has been deleted")
+                return response
+            except Exception as e:
+                logger.error("DELETE_ENTITY FAILED:")
+                logger.error(f"  - Exception type: {type(e)}")
+                logger.error(f"  - Exception message: {str(e)}")
+                logger.error(f"  - Entity ID: {entity_id}")
+                import traceback
+                logger.error(f"  - Full traceback: {traceback.format_exc()}")
+                raise
         
         elif tool_name == "delete_relation":
-            result = await lightrag_client.delete_relation(arguments["relation_id"])
-            return _create_success_response(result, tool_name)
+            logger.info("EXECUTING DELETE_RELATION TOOL:")
+            logger.info(f"  - Tool: {tool_name}")
+            logger.info(f"  - Client type: {type(lightrag_client)}")
+            logger.info(f"  - Client base_url: {lightrag_client.base_url}")
+            logger.info(f"  - Raw arguments: {arguments}")
+            
+            relation_id = arguments.get("relation_id", "")
+            logger.info(f"DELETE_RELATION PARAMETERS:")
+            logger.info(f"  - relation_id: '{relation_id}'")
+            logger.info(f"  - relation_id type: {type(relation_id)}")
+            
+            if not relation_id or not relation_id.strip():
+                logger.error("DELETE_RELATION VALIDATION ERROR:")
+                logger.error("  - Relation ID is empty or whitespace only")
+                raise LightRAGValidationError("Relation ID cannot be empty")
+            
+            logger.info("  - Parameter validation passed")
+            logger.info("  - Calling lightrag_client.delete_relation()...")
+            logger.warning(f"  - DESTRUCTIVE OPERATION: Deleting relation {relation_id}")
+            
+            try:
+                result = await lightrag_client.delete_relation(relation_id)
+                logger.info("DELETE_RELATION SUCCESS:")
+                logger.info(f"  - Result type: {type(result)}")
+                logger.info(f"  - Result content: {repr(result)}")
+                if hasattr(result, 'model_dump'):
+                    try:
+                        result_dump = result.model_dump()
+                        logger.info(f"  - Result.model_dump(): {result_dump}")
+                        logger.info(f"  - Status: {result_dump.get('status', 'N/A')}")
+                        logger.info(f"  - Message: {result_dump.get('message', 'N/A')}")
+                    except Exception as e:
+                        logger.error(f"  - model_dump() failed: {e}")
+                
+                response = _create_success_response(result, tool_name)
+                logger.info(f"  - Success response created")
+                logger.warning(f"  - Relation {relation_id} has been deleted")
+                return response
+            except Exception as e:
+                logger.error("DELETE_RELATION FAILED:")
+                logger.error(f"  - Exception type: {type(e)}")
+                logger.error(f"  - Exception message: {str(e)}")
+                logger.error(f"  - Relation ID: {relation_id}")
+                import traceback
+                logger.error(f"  - Full traceback: {traceback.format_exc()}")
+                raise
         
         # System Management Tools (5 tools)
         elif tool_name == "get_pipeline_status":
@@ -1006,16 +1914,144 @@ async def handle_call_tool(self, request: CallToolRequest) -> dict:
                 raise
         
         elif tool_name == "get_track_status":
-            result = await lightrag_client.get_track_status(arguments["track_id"])
-            return _create_success_response(result, tool_name)
+            logger.info("EXECUTING GET_TRACK_STATUS TOOL:")
+            logger.info(f"  - Tool: {tool_name}")
+            logger.info(f"  - Client type: {type(lightrag_client)}")
+            logger.info(f"  - Client base_url: {lightrag_client.base_url}")
+            logger.info(f"  - Raw arguments: {arguments}")
+            
+            track_id = arguments.get("track_id", "")
+            logger.info(f"GET_TRACK_STATUS PARAMETERS:")
+            logger.info(f"  - track_id: '{track_id}'")
+            logger.info(f"  - track_id type: {type(track_id)}")
+            
+            if not track_id or not track_id.strip():
+                logger.error("GET_TRACK_STATUS VALIDATION ERROR:")
+                logger.error("  - Track ID is empty or whitespace only")
+                raise LightRAGValidationError("Track ID cannot be empty")
+            
+            logger.info("  - Parameter validation passed")
+            logger.info("  - Calling lightrag_client.get_track_status()...")
+            
+            try:
+                result = await lightrag_client.get_track_status(track_id)
+                logger.info("GET_TRACK_STATUS SUCCESS:")
+                logger.info(f"  - Result type: {type(result)}")
+                logger.info(f"  - Result content: {repr(result)}")
+                if hasattr(result, 'model_dump'):
+                    try:
+                        result_dump = result.model_dump()
+                        logger.info(f"  - Result.model_dump(): {result_dump}")
+                        logger.info(f"TRACK STATUS DETAILS:")
+                        logger.info(f"    - Track ID: {result_dump.get('track_id', 'N/A')}")
+                        documents = result_dump.get('documents', [])
+                        logger.info(f"    - Documents count: {len(documents)}")
+                        logger.info(f"    - Total count: {result_dump.get('total_count', 'N/A')}")
+                        status_summary = result_dump.get('status_summary', {})
+                        logger.info(f"    - Status summary: {status_summary}")
+                        if documents:
+                            logger.info(f"    - First document ID: {documents[0].get('id', 'N/A')}")
+                            logger.info(f"    - First document status: {documents[0].get('status', 'N/A')}")
+                    except Exception as e:
+                        logger.error(f"  - model_dump() failed: {e}")
+                
+                response = _create_success_response(result, tool_name)
+                logger.info(f"  - Success response created")
+                return response
+            except Exception as e:
+                logger.error("GET_TRACK_STATUS FAILED:")
+                logger.error(f"  - Exception type: {type(e)}")
+                logger.error(f"  - Exception message: {str(e)}")
+                logger.error(f"  - Track ID: {track_id}")
+                import traceback
+                logger.error(f"  - Full traceback: {traceback.format_exc()}")
+                raise
         
         elif tool_name == "get_document_status_counts":
-            result = await lightrag_client.get_document_status_counts()
-            return _create_success_response(result, tool_name)
+            logger.info("EXECUTING GET_DOCUMENT_STATUS_COUNTS TOOL:")
+            logger.info(f"  - Tool: {tool_name}")
+            logger.info(f"  - Client type: {type(lightrag_client)}")
+            logger.info(f"  - Client base_url: {lightrag_client.base_url}")
+            logger.info(f"  - Arguments: {arguments}")
+            logger.info("  - This tool requires no parameters")
+            logger.info("  - Calling lightrag_client.get_document_status_counts()...")
+            
+            try:
+                result = await lightrag_client.get_document_status_counts()
+                logger.info("GET_DOCUMENT_STATUS_COUNTS SUCCESS:")
+                logger.info(f"  - Result type: {type(result)}")
+                logger.info(f"  - Result content: {repr(result)}")
+                if hasattr(result, 'model_dump'):
+                    try:
+                        result_dump = result.model_dump()
+                        logger.info(f"  - Result.model_dump(): {result_dump}")
+                        status_counts = result_dump.get('status_counts', {})
+                        logger.info(f"DOCUMENT STATUS COUNTS:")
+                        for status, count in status_counts.items():
+                            logger.info(f"    - {status}: {count}")
+                        total_docs = status_counts.get('all', 0)
+                        processed_docs = status_counts.get('processed', 0)
+                        failed_docs = status_counts.get('failed', 0)
+                        pending_docs = status_counts.get('pending', 0)
+                        processing_docs = status_counts.get('processing', 0)
+                        logger.info(f"SUMMARY:")
+                        logger.info(f"    - Total documents: {total_docs}")
+                        logger.info(f"    - Success rate: {(processed_docs/total_docs*100) if total_docs > 0 else 0:.1f}%")
+                        logger.info(f"    - Active processing: {processing_docs + pending_docs}")
+                        if failed_docs > 0:
+                            logger.warning(f"    - Failed documents: {failed_docs}")
+                    except Exception as e:
+                        logger.error(f"  - model_dump() failed: {e}")
+                
+                response = _create_success_response(result, tool_name)
+                logger.info(f"  - Success response created")
+                return response
+            except Exception as e:
+                logger.error("GET_DOCUMENT_STATUS_COUNTS FAILED:")
+                logger.error(f"  - Exception type: {type(e)}")
+                logger.error(f"  - Exception message: {str(e)}")
+                import traceback
+                logger.error(f"  - Full traceback: {traceback.format_exc()}")
+                raise
         
         elif tool_name == "clear_cache":
-            result = await lightrag_client.clear_cache()
-            return _create_success_response(result, tool_name)
+            logger.info("EXECUTING CLEAR_CACHE TOOL:")
+            logger.info(f"  - Tool: {tool_name}")
+            logger.info(f"  - Client type: {type(lightrag_client)}")
+            logger.info(f"  - Client base_url: {lightrag_client.base_url}")
+            logger.info(f"  - Arguments: {arguments}")
+            logger.info("  - This tool requires no parameters")
+            logger.info("  - Calling lightrag_client.clear_cache()...")
+            logger.warning("  - CACHE OPERATION: Clearing system cache")
+            
+            try:
+                result = await lightrag_client.clear_cache()
+                logger.info("CLEAR_CACHE SUCCESS:")
+                logger.info(f"  - Result type: {type(result)}")
+                logger.info(f"  - Result content: {repr(result)}")
+                if hasattr(result, 'model_dump'):
+                    try:
+                        result_dump = result.model_dump()
+                        logger.info(f"  - Result.model_dump(): {result_dump}")
+                        logger.info(f"CACHE CLEAR DETAILS:")
+                        logger.info(f"    - Status: {result_dump.get('status', 'N/A')}")
+                        logger.info(f"    - Message: {result_dump.get('message', 'N/A')}")
+                        logger.info(f"    - Cache cleared: {result_dump.get('cache_cleared', 'N/A')}")
+                        logger.info(f"    - Items cleared: {result_dump.get('items_cleared', 'N/A')}")
+                    except Exception as e:
+                        logger.error(f"  - model_dump() failed: {e}")
+                
+                response = _create_success_response(result, tool_name)
+                logger.info(f"  - Success response created")
+                logger.info("  - System cache has been cleared")
+                return response
+            except Exception as e:
+                logger.error("CLEAR_CACHE FAILED:")
+                logger.error(f"  - Exception type: {type(e)}")
+                logger.error(f"  - Exception message: {str(e)}")
+                import traceback
+                logger.error(f"  - Full traceback: {traceback.format_exc()}")
+                raise
         
         elif tool_name == "get_health":
             logger.info("EXECUTING GET_HEALTH TOOL:")
