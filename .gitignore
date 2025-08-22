@@ -178,8 +178,7 @@ cython_debug/
 *~
 
 # Archive directory should be included in version control
-archive/ 
-lightrag_mcp_comprehensive_test_report_jan2025.md
+archive/
 
 # Temporary test files (but not archived ones)
 temp_test_*.py
