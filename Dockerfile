@@ -2,19 +2,16 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# Системные зависимости (если потребуется)
+# системные зав-ти (если потребуются)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
     && rm -rf /var/lib/apt/lists/*
 
-# Копируем мета-файлы
-COPY pyproject.toml README.md ./
-
-# Устанавливаем пакет (включая зависимости)
-RUN pip install --no-cache-dir .
-
-# Копируем весь исходный код
+# КОПИРУЕМ ВСЁ (включая src/)
 COPY . .
 
-# Запускаем MCP-сервер
+# устанавливаем пакет + зависимости
+RUN pip install --no-cache-dir .
+
+# точка входа уже прописана в pyproject.toml
 CMD ["daniel-lightrag-mcp"]
