@@ -26,6 +26,8 @@ dependencies = [
     "httpx>=0.24.0",
     "pydantic>=2.0.0",
     "anyio>=3.0.0",
+    "starlette>=0.32",
+    "uvicorn[standard]>=0.24",
 ]
 
 [project.optional-dependencies]
