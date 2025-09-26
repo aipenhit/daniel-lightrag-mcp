@@ -3,7 +3,13 @@ services:
     build: .
     container_name: daniel_mcp
     ports:
-      - "8008:8000"
+      - "8008:8000"          # хост:контейнер
     env_file:
       - .env
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.mcp.rule=Host(`mcp.aixt.ru`)"
+      - "traefik.http.services.mcp.loadbalancer.server.port=8000"  # внутренний
     restart: unless-stopped
+    networks:
+      - dokploy-network
