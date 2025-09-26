@@ -3,7 +3,7 @@ services:
     build: .
     container_name: daniel_mcp
     ports:
-      - "8008:8008"
+      - "8008:8000"
     env_file:
       - .env
     restart: unless-stopped
