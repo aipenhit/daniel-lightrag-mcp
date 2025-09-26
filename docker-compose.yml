@@ -1,11 +1,9 @@
 services:
   daniel-lightrag-mcp:
     build: .
-    container_name: mcp
+    container_name: daniel_mcp
     ports:
       - "8008:8000"
     env_file:
-      - .env          # путь относительно папки с compose-файлом
-    depends_on:
-      - lightrag
+      - .env
     restart: unless-stopped
